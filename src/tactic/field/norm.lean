@@ -25,9 +25,8 @@ def singleton (x : @nterm γ _) : Π {b}, @alt γ _ b
 | tt := sform ∅ (sterm.singleton x)
 | ff := pform ∅ (pterm.singleton x)
 
-def to_nterm : Π {b}, @alt γ _ b → @nterm γ _
-| ._ (sform _ S) := S.to_nterm
-| ._ (pform _ P) := P.to_nterm
+def to_nterm : @alt γ _ tt → @nterm γ _
+| (sform _ S) := S.to_nterm
 
 def to_sterm : @alt γ _ tt → @sterm γ _
 | (sform _ S) := S
@@ -63,13 +62,9 @@ def hyps_to_pform {a} {x : @alt γ _ a} :
   x.hyps = x.to_pform.hyps :=
 by cases x; simp [hyps, to_pform]
 
-theorem eval_def {b} {x : @alt γ _ b} :
+theorem eval_def {x : @alt γ _ tt} :
   eval ρ x = nterm.eval ρ x.to_nterm :=
-begin
-cases x with ts S,
-  { simp [eval, to_nterm, sterm.eval_to_nterm] },
-  { simp [eval, to_nterm, pterm.eval_to_nterm] }
-end
+by {cases x, simp [eval, to_nterm, sterm.eval_to_nterm]}
 
 theorem eval_singleton {b} {x : @nterm γ _} :
   eval ρ (singleton x : @alt γ _ b) = nterm.eval ρ x :=
