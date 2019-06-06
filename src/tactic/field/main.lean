@@ -1,4 +1,3 @@
-import data.list.alist data.finmap
 import .norm
 
 namespace list
@@ -29,13 +28,13 @@ def to_dict {α} [inhabited α] (l : list α) : dict α :=
 
 end list
 
-namespace finmap
-open field
-
-def to_dict {α} [discrete_field α] (m : finmap (λ _ : num, α)) : dict α :=
-⟨λ i, match finmap.lookup i m with (some x) := x | _ := 0 end⟩
-
-end finmap
+--namespace finmap
+--open field
+--
+--def to_dict {α} [discrete_field α] (m : finmap (λ _ : num, α)) : dict α :=
+--⟨λ i, match finmap.lookup i m with (some x) := x | _ := 0 end⟩
+--
+--end finmap
 
 namespace field
 variables {α : Type} [discrete_field α]
