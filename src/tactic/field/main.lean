@@ -258,8 +258,6 @@ do
   nhyps ← monad.mapm (nterm_to_expr `(ℝ) s) nhyps,
   nhyps ← monad.mapm (λ e, to_expr ``(%%e ≠ 0)) nhyps,
   mvars ← monad.mapm mk_meta_var nhyps,
-  gs ← get_goals,
-  set_goals (gs ++ mvars),
 
   --proving the premise of the correctness theorem using mvars
   pe ← to_expr $ mvars.foldr (λ e pe, ``((and.intro %%e %%pe))) ``(trivial),
