@@ -267,42 +267,32 @@ meta instance [has_to_string γ] : has_to_tactic_format (@nterm γ _) := ⟨λ x
 
 def sum : list (@nterm γ _) → @nterm γ _
 | []      := (0 : @nterm γ _)
-| (x::xs) := list.foldl add x xs
+| [x]     := x
+| (x::xs) := sum xs + x
 
 def prod : list (@nterm γ _) → @nterm γ _
 | []      := (1 : @nterm γ _)
-| (x::xs) := list.foldl mul x xs
+| [x]     := x
+| (x::xs) := prod xs * x
 
 theorem eval_sum (xs : list (@nterm γ _)) :
   (sum xs).eval ρ = list.sum (xs.map (nterm.eval ρ)) :=
 begin
-  cases xs with y xs,
+  induction xs with x0 xs ih,
   { simp [sum] },
-  { unfold sum,
-    rw [list.map_cons, list.sum_cons],
-    revert y,
-    induction xs with x xs ih,
-    { simp },
-    { intro y,
-      rw [list.map_cons, list.foldl_cons, list.sum_cons],
-      rw [ih (add y x), ← add_assoc, ← eval_add],
-      refl }}
+  { cases xs with x1 xs,
+    { simp [sum] },
+    { unfold sum, rw [list.map_cons, list.sum_cons, eval_add, ih, add_comm] }}
 end
 
 theorem eval_prod (xs : list (@nterm γ _)) :
   (prod xs).eval ρ = list.prod (xs.map (nterm.eval ρ)) :=
 begin
-  cases xs with y xs,
+  induction xs with x0 xs ih,
   { simp [prod] },
-  { unfold prod,
-    rw [list.map_cons, list.prod_cons],
-    revert y,
-    induction xs with x xs ih,
-    { simp },
-    { intro y,
-      rw [list.map_cons, list.foldl_cons, list.prod_cons],
-      rw [ih (mul y x), ← mul_assoc, ← eval_mul],
-      refl }}
+  { cases xs with x1 xs,
+    { simp [prod] },
+    { unfold prod, rw [list.map_cons, list.prod_cons, eval_mul, ih, mul_comm] }}
 end
 
 def nonzero (ρ : dict α) (ts : list (@nterm γ _)) : Prop :=
