@@ -158,26 +158,23 @@ end
 end cterm
 
 structure sterm : Type :=
+(coeff1 : γ)
 (terms : list (@cterm γ _))
 
 namespace sterm
 
 def of_const (a : γ) : @sterm γ _ :=
-if ha : a = 0 then { terms := [] }
-else { terms := [⟨1, a, ha⟩] }
+{ coeff1 := a, terms := [] }
 
 def singleton (x : @nterm γ _) : @sterm γ _ :=
-{ terms := [⟨x, 1, by simp⟩] }
+{ coeff1 := 0, terms := [⟨x, 1, by simp⟩] }
 
 def eval (ρ : dict α) (S : @sterm γ _) : α :=
-list.sum (S.terms.map (cterm.eval ρ))
+list.sum (S.terms.map (cterm.eval ρ)) + S.coeff1
 
 theorem eval_of_const (a : γ) :
   sterm.eval ρ (of_const a) = ↑a :=
-begin
-  by_cases ha : a = 0;
-  simp [of_const, sterm.eval, cterm.eval, ha]
-end
+by simp [of_const, sterm.eval, cterm.eval]
 
 theorem eval_singleton (x : @nterm γ _) :
   sterm.eval ρ (singleton x) = nterm.eval ρ x :=
@@ -188,12 +185,17 @@ end
 
 --mul
 def add (S T : @sterm γ _) : @sterm γ _ :=
-{ terms := cterm.smerge S.terms T.terms, }
+{ coeff1 := S.coeff1 + T.coeff1,
+  terms := cterm.smerge S.terms T.terms, }
 
 --pow
 def mul (S : @sterm γ _) (a : γ) : @sterm γ _ :=
-if ha : a = 0 then { terms := [] }
-else { terms := S.terms.map (λ x, cterm.mul x a ha), }
+if ha : a = 0 then
+  of_const 0
+else
+  { coeff1 := S.coeff1 * a,
+    terms := S.terms.map (λ x, cterm.mul x a ha),
+  }
 
 instance : has_add (@sterm γ _) := ⟨add⟩
 
@@ -201,57 +203,53 @@ theorem add_terms {S T : @sterm γ _} :
   (S + T).terms = cterm.smerge S.terms T.terms :=
 by simp [has_add.add, add]
 
+theorem add_coeff {S T : @sterm γ _} :
+  (S + T).coeff1 = S.coeff1 + T.coeff1 :=
+by simp [has_add.add, add]
+
 theorem eval_add {S T : @sterm γ _} :
   sterm.eval ρ (S + T) = sterm.eval ρ S + sterm.eval ρ T :=
 begin
   unfold sterm.eval,
-  rw [add_terms, cterm.eval_smerge]
+  rw [add_terms, cterm.eval_smerge, add_coeff, morph.morph_add],
+  ring
 end
 
 theorem eval_mul {S : @sterm γ _} {a : γ} :
   sterm.eval ρ (S.mul a) = sterm.eval ρ S * ↑a :=
 begin
   by_cases ha : a = 0,
-  { simp [mul, eval, ha] },
+  { simp [mul, eval, ha, of_const] },
   { unfold sterm.eval, unfold mul,
-    rw cterm.eval_sum_mul,
-     { simp [ha] },
-     { exact ha }}
+    rw [add_mul, cterm.eval_sum_mul],
+    simp [ha], apply add_comm } --TODO
 end
 
-def to_nterm (S : @sterm γ _) : @nterm γ _ :=
-if S.terms.empty then 0
-else
-  --let a := S.terms.head.coeff in
-  if S.terms.head.coeff = 1 then
-    sum (list.map (cterm.to_nterm) S.terms)
-  else
-    sum (list.map (cterm.to_nterm) (S.mul (S.terms.head.coeff⁻¹)).terms) * S.terms.head.coeff
 
-theorem eval_to_nterm_aux {S : @sterm γ _} :
-  sterm.eval ρ S = nterm.eval ρ (sum (list.map (cterm.to_nterm) S.terms)) :=
-by {unfold eval, rw [nterm.eval_sum, list.map_map, cterm.eval_to_nterm']}
+def to_nterm (S : @sterm γ _) : @nterm γ _ :=
+if h : S.coeff1 = 0 then
+  let _ := trace "oups" () in
+  match S.terms with
+  | []      := 0
+  | (x::xs) :=
+    if x.coeff = 1 then
+      nterm.sum (S.terms.map cterm.to_nterm)
+    else
+      (nterm.sum (S.terms.map (λ x, (x.mul x.coeff⁻¹ (by simp [x.pr])).to_nterm))) * x.coeff
+  end
+else if S.coeff1 = 1 then
+  nterm.sum (S.terms.map cterm.to_nterm)
+else
+  if S.terms.empty then
+    S.coeff1
+  else
+    have h' : S.coeff1⁻¹ ≠ 0, by simp [h],
+    (nterm.sum (S.terms.map (λ x, (x.mul S.coeff1⁻¹ h').to_nterm)) + 1) * S.coeff1
 
 theorem eval_to_nterm {S : @sterm γ _} :
   sterm.eval ρ S = nterm.eval ρ S.to_nterm :=
 begin
-  by_cases h1 : S.terms.empty = tt,
-  { cases S with ts, cases ts,
-    { simp [to_nterm, eval, list.empty, h1] },
-    { cases h1 }},
-  { unfold to_nterm, rw if_neg h1,
-    by_cases h2 : S.terms.head.coeff = 1,
-    { rw if_pos h2, apply eval_to_nterm_aux },
-    { rw if_neg h2,
-      generalize h3 : S.terms.head.coeff = a,
-      rw [nterm.eval_mul, nterm.eval_const],
-      rw ← @mul_div_cancel' α _ (eval ρ S) ↑a,
-      { rw [division_def, ← morph.morph_inv, ← eval_mul],
-        rw eval_to_nterm_aux, apply mul_comm },
-      { intro ha,
-        have : a = 0, from morph.morph_inj a ha,
-        have : a ≠ 0, by {rw ← h3, apply S.terms.head.pr },
-        contradiction }}}
+  sorry
 end
 
 def of_nterm : @nterm γ _ → @sterm γ _

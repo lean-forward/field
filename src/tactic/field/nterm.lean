@@ -200,6 +200,8 @@ instance : has_one (@nterm γ _) := ⟨const 1⟩
 instance : has_add (@nterm γ _) := ⟨add⟩
 instance : has_mul (@nterm γ _) := ⟨mul⟩
 instance : has_pow (@nterm γ _) znum := ⟨pow⟩
+instance pow_nat : has_pow (@nterm γ _) ℕ := ⟨λ x n, x.pow (n : znum)⟩ --test
+instance pow_int : has_pow (@nterm γ _) ℤ := ⟨λ x n, x.pow (n : znum)⟩ --test
 
 def neg (x : @nterm γ _) : @nterm γ _ := x * (-1 : γ)
 instance : has_neg (@nterm γ _) := ⟨neg⟩
