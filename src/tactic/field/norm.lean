@@ -21,6 +21,10 @@ variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
+def of_const (a : γ) : Π {b}, @alt γ _ b
+| tt := sform [] (sterm.of_const a)
+| ff := pform [] (pterm.of_const a)
+
 def singleton (x : @nterm γ _) : Π {b}, @alt γ _ b
 | tt := sform ∅ (sterm.singleton x)
 | ff := pform ∅ (pterm.singleton x)
@@ -237,15 +241,16 @@ def of_nterm : Π (x : @nterm γ _), @alt γ _ (aux_of_nterm x)
 | (nterm.add x y) := add (of_nterm x) (of_nterm y)
 | (nterm.mul x y) := mul (of_nterm x) (of_nterm y)
 | (nterm.pow x n) := pow (of_nterm x) n
-| x := singleton x
+| (nterm.const a) := of_const a
+| (nterm.atom i)  := singleton i
 
 theorem eval_of_nterm {x : @nterm γ _} :
   nonzero ρ (of_nterm x).hyps →
   eval ρ (of_nterm x) = nterm.eval ρ x :=
 begin
   induction x with i c x y ihx ihy x y ihx ihy x n ihx,
-  { intro, unfold of_nterm, rw eval_singleton },
-  { intro, unfold of_nterm, rw eval_singleton },
+  { intro, unfold of_nterm, rw eval_singleton, refl },
+  { intro, unfold of_nterm, sorry },
   { unfold of_nterm, intro H,
     rw [hyps_add,  nonzero_union] at H,
     rw [eval_add, ihx, ihy],

@@ -80,7 +80,7 @@ def to_nterm : @eterm γ _ → @nterm γ _
 | (mul x y) := to_nterm x * to_nterm y
 | (div x y) := to_nterm x / to_nterm y
 | (neg x)   := - to_nterm x
-| (inv x)   := to_nterm x ^ (-1 : znum)
+| (inv x)   := (to_nterm x)⁻¹
 | (pow x n) := to_nterm x ^ (n : znum)
 
 theorem correctness {x : @eterm γ _} :
@@ -99,8 +99,7 @@ begin
   unfold to_nterm; unfold eterm.eval,
   repeat { simp },
   repeat { simp [ihx] },
-  repeat { simp [ihx, ihy] },
-  { simp [fpow_inv] }
+  repeat { simp [ihx, ihy] }
 end
 
 end eterm
