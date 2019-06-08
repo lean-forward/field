@@ -21,17 +21,20 @@ instance : inhabited (@cterm γ _) := ⟨⟨nterm.const 0, 1, by simp⟩⟩
 def to_nterm (x : @cterm γ _) : @nterm γ _ :=
 if x.coeff = 0 then 0
 else if x.coeff = 1 then x.term
+else if x.term = 1 then x.coeff
 else x.term * x.coeff
 
 def eval (ρ : dict α) (x : @cterm γ _) : α :=
 nterm.eval ρ x.term * ↑x.coeff
 
+@[simp]
 def eval_to_nterm {x : @cterm γ _} :
  nterm.eval ρ x.to_nterm = cterm.eval ρ x :=
 begin
   by_cases h1 : x.coeff = 0;
   by_cases h2 : x.coeff = 1;
-  simp [nterm.eval, cterm.eval, to_nterm, h1, h2]
+  by_cases h3 : x.term = 1;
+  simp [nterm.eval, cterm.eval, to_nterm, h1, h2, h3]
 end
 
 theorem eval_to_nterm' :
@@ -60,6 +63,14 @@ theorem eval_mul {x : @cterm γ _} {a : γ} {ha : a ≠ 0} :
   cterm.eval ρ (x.mul a ha) = cterm.eval ρ x * ↑a :=
 begin
   simp [cterm.eval, morph.morph_mul, mul], ring
+end
+
+theorem eval_mul' {a : γ} {ha : a ≠ 0} :
+  cterm.eval ρ ∘ (λ x : cterm, x.mul a ha) =
+    λ x, cterm.eval ρ x * (a : α) :=
+begin
+  unfold function.comp,
+  simp [eval_mul]
 end
 
 theorem eval_sum_mul {xs : list (@cterm γ _)} {a : γ} {ha : a ≠ 0} :
@@ -220,38 +231,42 @@ begin
 end
 
 def to_nterm (S : @sterm γ _) : @nterm γ _ :=
-if S.terms.empty then 0
-else
-  --let a := S.terms.head.coeff in
-  if S.terms.head.coeff = 1 then
-    sum (list.map (cterm.to_nterm) S.terms)
+match S.terms with
+| [] := 0
+| [x] := x.to_nterm
+| (x0::xs) :=
+  if x0.coeff = 1 then
+    sum (list.map cterm.to_nterm (x0::xs))
   else
-    sum (list.map (cterm.to_nterm) (S.mul (S.terms.head.coeff⁻¹)).terms) * S.terms.head.coeff
-
-theorem eval_to_nterm_aux {S : @sterm γ _} :
-  sterm.eval ρ S = nterm.eval ρ (sum (list.map (cterm.to_nterm) S.terms)) :=
-by {unfold eval, rw [nterm.eval_sum, list.map_map, cterm.eval_to_nterm']}
+    have h0 : x0.coeff⁻¹ ≠ 0, by simp [x0.pr],
+    ( nterm.sum
+      (xs.map (λ x, (x.mul x0.coeff⁻¹ h0).to_nterm))
+        + x0.term ) * x0.coeff
+end
 
 theorem eval_to_nterm {S : @sterm γ _} :
   sterm.eval ρ S = nterm.eval ρ S.to_nterm :=
 begin
-  by_cases h1 : S.terms.empty = tt,
-  { cases S with ts, cases ts,
-    { simp [to_nterm, eval, list.empty, h1] },
-    { cases h1 }},
-  { unfold to_nterm, rw if_neg h1,
-    by_cases h2 : S.terms.head.coeff = 1,
-    { rw if_pos h2, apply eval_to_nterm_aux },
-    { rw if_neg h2,
-      generalize h3 : S.terms.head.coeff = a,
-      rw [nterm.eval_mul, nterm.eval_const],
-      rw ← @mul_div_cancel' α _ (eval ρ S) ↑a,
-      { rw [division_def, ← morph.morph_inv, ← eval_mul],
-        rw eval_to_nterm_aux, apply mul_comm },
-      { intro ha,
-        have : a = 0, from morph.morph_inj a ha,
-        have : a ≠ 0, by {rw ← h3, apply S.terms.head.pr },
-        contradiction }}}
+  cases S with ts,
+  cases ts with t0 ts,
+  { simp [eval, to_nterm] },
+  cases ts with t1 ts,
+  { simp [eval, to_nterm] },
+  by_cases h1 : t0.coeff = 1,
+  { simp [eval, to_nterm, h1, nterm.eval_sum, cterm.eval_to_nterm'] },
+
+  unfold eval, unfold to_nterm,
+  rw if_neg h1,
+  rw [nterm.eval_mul, nterm.eval_add, nterm.eval_sum, nterm.eval_const],
+  rw [← list.map_map cterm.to_nterm,
+    list.map_map _ cterm.to_nterm,
+    cterm.eval_to_nterm', list.map_map,
+    ← cterm.eval_sum_mul],
+  rw [add_mul, mul_assoc, ← morph.morph_mul, inv_mul_cancel,
+    morph.morph1, mul_one],
+  swap, by simp [t0.pr],
+  rw [list.map_cons, list.sum_cons],
+  unfold cterm.eval, apply add_comm
 end
 
 def of_nterm : @nterm γ _ → @sterm γ _
@@ -275,4 +290,3 @@ end
 end sterm
 
 end field
-
