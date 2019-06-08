@@ -21,17 +21,20 @@ instance : inhabited (@cterm γ _) := ⟨⟨nterm.const 0, 1, by simp⟩⟩
 def to_nterm (x : @cterm γ _) : @nterm γ _ :=
 if x.coeff = 0 then 0
 else if x.coeff = 1 then x.term
+else if x.term = 1 then x.coeff
 else x.term * x.coeff
 
 def eval (ρ : dict α) (x : @cterm γ _) : α :=
 nterm.eval ρ x.term * ↑x.coeff
 
+@[simp]
 def eval_to_nterm {x : @cterm γ _} :
  nterm.eval ρ x.to_nterm = cterm.eval ρ x :=
 begin
   by_cases h1 : x.coeff = 0;
   by_cases h2 : x.coeff = 1;
-  simp [nterm.eval, cterm.eval, to_nterm, h1, h2]
+  by_cases h3 : x.term = 1;
+  simp [nterm.eval, cterm.eval, to_nterm, h1, h2, h3]
 end
 
 theorem eval_to_nterm' :
@@ -60,6 +63,14 @@ theorem eval_mul {x : @cterm γ _} {a : γ} {ha : a ≠ 0} :
   cterm.eval ρ (x.mul a ha) = cterm.eval ρ x * ↑a :=
 begin
   simp [cterm.eval, morph.morph_mul, mul], ring
+end
+
+theorem eval_mul' {a : γ} {ha : a ≠ 0} :
+  cterm.eval ρ ∘ (λ x : cterm, x.mul a ha) =
+    λ x, cterm.eval ρ x * (a : α) :=
+begin
+  unfold function.comp,
+  simp [eval_mul]
 end
 
 theorem eval_sum_mul {xs : list (@cterm γ _)} {a : γ} {ha : a ≠ 0} :
@@ -158,23 +169,26 @@ end
 end cterm
 
 structure sterm : Type :=
-(coeff1 : γ)
 (terms : list (@cterm γ _))
 
 namespace sterm
 
 def of_const (a : γ) : @sterm γ _ :=
-{ coeff1 := a, terms := [] }
+if ha : a = 0 then { terms := [] }
+else { terms := [⟨1, a, ha⟩] }
 
 def singleton (x : @nterm γ _) : @sterm γ _ :=
-{ coeff1 := 0, terms := [⟨x, 1, by simp⟩] }
+{ terms := [⟨x, 1, by simp⟩] }
 
 def eval (ρ : dict α) (S : @sterm γ _) : α :=
-list.sum (S.terms.map (cterm.eval ρ)) + S.coeff1
+list.sum (S.terms.map (cterm.eval ρ))
 
 theorem eval_of_const (a : γ) :
   sterm.eval ρ (of_const a) = ↑a :=
-by simp [of_const, sterm.eval, cterm.eval]
+begin
+  by_cases ha : a = 0;
+  simp [of_const, sterm.eval, cterm.eval, ha]
+end
 
 theorem eval_singleton (x : @nterm γ _) :
   sterm.eval ρ (singleton x) = nterm.eval ρ x :=
@@ -185,17 +199,12 @@ end
 
 --mul
 def add (S T : @sterm γ _) : @sterm γ _ :=
-{ coeff1 := S.coeff1 + T.coeff1,
-  terms := cterm.smerge S.terms T.terms, }
+{ terms := cterm.smerge S.terms T.terms, }
 
 --pow
 def mul (S : @sterm γ _) (a : γ) : @sterm γ _ :=
-if ha : a = 0 then
-  of_const 0
-else
-  { coeff1 := S.coeff1 * a,
-    terms := S.terms.map (λ x, cterm.mul x a ha),
-  }
+if ha : a = 0 then { terms := [] }
+else { terms := S.terms.map (λ x, cterm.mul x a ha), }
 
 instance : has_add (@sterm γ _) := ⟨add⟩
 
@@ -203,53 +212,61 @@ theorem add_terms {S T : @sterm γ _} :
   (S + T).terms = cterm.smerge S.terms T.terms :=
 by simp [has_add.add, add]
 
-theorem add_coeff {S T : @sterm γ _} :
-  (S + T).coeff1 = S.coeff1 + T.coeff1 :=
-by simp [has_add.add, add]
-
 theorem eval_add {S T : @sterm γ _} :
   sterm.eval ρ (S + T) = sterm.eval ρ S + sterm.eval ρ T :=
 begin
   unfold sterm.eval,
-  rw [add_terms, cterm.eval_smerge, add_coeff, morph.morph_add],
-  ring
+  rw [add_terms, cterm.eval_smerge]
 end
 
 theorem eval_mul {S : @sterm γ _} {a : γ} :
   sterm.eval ρ (S.mul a) = sterm.eval ρ S * ↑a :=
 begin
   by_cases ha : a = 0,
-  { simp [mul, eval, ha, of_const] },
+  { simp [mul, eval, ha] },
   { unfold sterm.eval, unfold mul,
-    rw [add_mul, cterm.eval_sum_mul],
-    simp [ha], apply add_comm } --TODO
+    rw cterm.eval_sum_mul,
+     { simp [ha] },
+     { exact ha }}
 end
 
-
 def to_nterm (S : @sterm γ _) : @nterm γ _ :=
-if h : S.coeff1 = 0 then
-  let _ := trace "oups" () in
-  match S.terms with
-  | []      := 0
-  | (x::xs) :=
-    if x.coeff = 1 then
-      nterm.sum (S.terms.map cterm.to_nterm)
-    else
-      (nterm.sum (S.terms.map (λ x, (x.mul x.coeff⁻¹ (by simp [x.pr])).to_nterm))) * x.coeff
-  end
-else if S.coeff1 = 1 then
-  nterm.sum (S.terms.map cterm.to_nterm)
-else
-  if S.terms.empty then
-    S.coeff1
+match S.terms with
+| [] := 0
+| [x] := x.to_nterm
+| (x0::xs) :=
+  if x0.coeff = 1 then
+    sum (list.map cterm.to_nterm (x0::xs))
   else
-    have h' : S.coeff1⁻¹ ≠ 0, by simp [h],
-    (nterm.sum (S.terms.map (λ x, (x.mul S.coeff1⁻¹ h').to_nterm)) + 1) * S.coeff1
+    have h0 : x0.coeff⁻¹ ≠ 0, by simp [x0.pr],
+    ( nterm.sum
+      (xs.map (λ x, (x.mul x0.coeff⁻¹ h0).to_nterm))
+        + x0.term ) * x0.coeff
+end
 
 theorem eval_to_nterm {S : @sterm γ _} :
   sterm.eval ρ S = nterm.eval ρ S.to_nterm :=
 begin
-  sorry
+  cases S with ts,
+  cases ts with t0 ts,
+  { simp [eval, to_nterm] },
+  cases ts with t1 ts,
+  { simp [eval, to_nterm] },
+  by_cases h1 : t0.coeff = 1,
+  { simp [eval, to_nterm, h1, nterm.eval_sum, cterm.eval_to_nterm'] },
+
+  unfold eval, unfold to_nterm,
+  rw if_neg h1,
+  rw [nterm.eval_mul, nterm.eval_add, nterm.eval_sum, nterm.eval_const],
+  rw [← list.map_map cterm.to_nterm,
+    list.map_map _ cterm.to_nterm,
+    cterm.eval_to_nterm', list.map_map,
+    ← cterm.eval_sum_mul],
+  rw [add_mul, mul_assoc, ← morph.morph_mul, inv_mul_cancel,
+    morph.morph1, mul_one],
+  swap, by simp [t0.pr],
+  rw [list.map_cons, list.sum_cons],
+  unfold cterm.eval, apply add_comm
 end
 
 def of_nterm : @nterm γ _ → @sterm γ _
@@ -273,4 +290,3 @@ end
 end sterm
 
 end field
-
