@@ -105,13 +105,22 @@ variables {a b : γ}
 
 instance has_coe : has_coe γ α := morph.cast γ α
 
-theorem morph_sub : ((a - b : γ) : α) = a - b :=
+attribute [squash_cast] morph0
+attribute [squash_cast] morph1
+attribute [elim_cast] morph_inj
+
+@[move_cast] theorem morph_add' : ∀ a b : γ, ((a + b : γ) : α) = a + b := by apply morph_add
+@[move_cast] theorem morph_neg' : ∀ a : γ, ((-a : γ) : α) = -a := by apply morph_neg
+@[move_cast] theorem morph_mul' : ∀ a b : γ, ((a * b : γ) : α) = a * b := by apply morph_mul
+@[move_cast] theorem morph_inv' : ∀ a : γ, ((a⁻¹ : γ) : α) = a⁻¹ := by apply morph_inv
+
+@[move_cast] theorem morph_sub : ((a - b : γ) : α) = a - b :=
 by rw [sub_eq_add_neg, morph.morph_add, morph.morph_neg, ← sub_eq_add_neg]
 
-theorem morph_div : ((a / b : γ) : α) = a / b :=
+@[move_cast] theorem morph_div : ((a / b : γ) : α) = a / b :=
 by rw [division_def, morph.morph_mul, morph.morph_inv, ← division_def]
 
-theorem morph_pow_nat (n : ℕ) : ((a ^ n : γ) : α) = a ^ n :=
+@[move_cast] theorem morph_pow_nat (n : ℕ) : ((a ^ n : γ) : α) = a ^ n :=
 begin
   induction n with _ ih,
   { rw [pow_zero, pow_zero, morph.morph1] },
@@ -123,7 +132,7 @@ begin
     { rw [pow_succ, morph.morph_mul, ih, ← pow_succ] }}
 end
 
-theorem morph_pow (n : ℤ) : ((a ^ n : γ) : α) = a ^ n :=
+@[move_cast] theorem morph_pow (n : ℤ) : ((a ^ n : γ) : α) = a ^ n :=
 begin
   cases n,
   { rw [int.of_nat_eq_coe, fpow_of_nat, fpow_of_nat],
