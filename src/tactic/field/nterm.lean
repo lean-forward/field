@@ -107,7 +107,6 @@ instance has_coe : has_coe γ α := morph.cast γ α
 
 attribute [squash_cast] morph0
 attribute [squash_cast] morph1
-attribute [elim_cast] morph_inj
 
 @[move_cast] theorem morph_add' : ∀ a b : γ, ((a + b : γ) : α) = a + b := by apply morph_add
 @[move_cast] theorem morph_neg' : ∀ a : γ, ((-a : γ) : α) = -a := by apply morph_neg
@@ -116,6 +115,19 @@ attribute [elim_cast] morph_inj
 
 @[move_cast] theorem morph_sub : ((a - b : γ) : α) = a - b :=
 by rw [sub_eq_add_neg, morph.morph_add, morph.morph_neg, ← sub_eq_add_neg]
+
+@[elim_cast] theorem morph_inj' : ∀ a b : γ, (a : α) = b ↔ a = b :=
+begin
+  intros a b,
+  apply iff.intro,
+  { intro h, apply eq_of_sub_eq_zero,
+    apply morph.morph_inj (a - b),
+    rw morph.morph_sub,
+    apply sub_eq_zero_of_eq,
+    apply h },
+  { intro h, subst h }
+end
+
 
 @[move_cast] theorem morph_div : ((a / b : γ) : α) = a / b :=
 by rw [division_def, morph.morph_mul, morph.morph_inv, ← division_def]
