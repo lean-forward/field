@@ -191,20 +191,20 @@ match e with
 | `(0 : ℝ) := return zero
 | `(1 : ℝ) := return one
 | `(%%a + %%b) := do
-    x ← eterm_of_expr a,
     y ← eterm_of_expr b,
+    x ← eterm_of_expr a,
     return (add x y)
 | `(%%a - %%b) := do
-    x ← eterm_of_expr a,
     y ← eterm_of_expr b,
+    x ← eterm_of_expr a,
     return (sub x y)
 | `(%%a * %%b) := do
-    x ← eterm_of_expr a,
     y ← eterm_of_expr b,
+    x ← eterm_of_expr a,
     return (mul x y)
 | `(%%a / %%b) := do
-    x ← eterm_of_expr a,
     y ← eterm_of_expr b,
+    x ← eterm_of_expr a,
     return (div x y)
 | `(-%%a) := do
     x ← eterm_of_expr a,
