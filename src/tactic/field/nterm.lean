@@ -128,7 +128,6 @@ begin
   { intro h, subst h }
 end
 
-
 @[move_cast] theorem morph_div : ((a / b : γ) : α) = a / b :=
 by rw [division_def, morph.morph_mul, morph.morph_inv, ← division_def]
 
@@ -189,12 +188,12 @@ instance : inhabited (@nterm γ _) := ⟨const 0⟩
 
 def ble :
   @nterm γ _ → @nterm γ _ → bool
-| (atom i)  (atom j)  := i ≤ j
-| (atom _)  _         := tt
-| _         (atom _)  := ff
 | (const a) (const b) := a ≤ b
 | (const _) _         := tt
 | _         (const _) := ff
+| (atom i)  (atom j)  := i ≤ j
+| (atom _)  _         := tt
+| _         (atom _)  := ff
 | (add x y) (add z w) := if x = z then ble y w else ble x z
 | (add _ _) _         := tt
 | _         (add _ _) := ff
