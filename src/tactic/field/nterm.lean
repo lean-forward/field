@@ -105,8 +105,8 @@ variables {a b : γ}
 
 instance has_coe : has_coe γ α := morph.cast γ α
 
-attribute [squash_cast] morph0
-attribute [squash_cast] morph1
+@[squash_cast] theorem morph0' : ((0 : γ) : α) = 0 := by apply morph.morph0
+@[squash_cast] theorem morph1' : ((1 : γ) : α) = 1 := by apply morph.morph1
 
 @[move_cast] theorem morph_add' : ∀ a b : γ, ((a + b : γ) : α) = a + b := by apply morph_add
 @[move_cast] theorem morph_neg' : ∀ a : γ, ((-a : γ) : α) = -a := by apply morph_neg
@@ -186,6 +186,17 @@ variables [morph γ α] {ρ : dict α}
 
 instance : inhabited (@nterm γ _) := ⟨const 0⟩
 
+--inductive le : @nterm γ _ → @nterm γ _ → Prop
+--| const_le_const {a b : γ} : a ≤ b → le (const a) (const b)
+--| atom_le_atom {i j : num} : i ≤ j → le (atom i) (atom j)
+--| add_le_add_1 {x y z w : @nterm γ _} : le y w → le (add x y) (add z w)
+--| add_le_add_2 {x y z : @nterm γ _} : le x z → le (add x y) (add z y)
+--| mul_le_mul_1 {x y z w : @nterm γ _} : le y w → le (mul x y) (mul z w)
+--| mul_le_mul_2 {x y z : @nterm γ _} : le x z → le (mul x y) (mul z y)
+--| pow_le_pow_1 {x y : @nterm γ _} {n m : znum} : le x y → le (pow x n) (pow y m)
+--| pow_le_pow_2 {x : @nterm γ _} {n m : znum} : n ≤ m → le (pow x n) (pow x m)
+--| ... 
+
 def ble :
   @nterm γ _ → @nterm γ _ → bool
 | (const a) (const b) := a ≤ b
@@ -194,10 +205,10 @@ def ble :
 | (atom i)  (atom j)  := i ≤ j
 | (atom _)  _         := tt
 | _         (atom _)  := ff
-| (add x y) (add z w) := if x = z then ble y w else ble x z
+| (add x y) (add z w) := if y = w then ble x z else ble y w
 | (add _ _) _         := tt
 | _         (add _ _) := ff
-| (mul x y) (mul z w) := if x = z then ble y w else ble x z
+| (mul x y) (mul z w) := if y = w then ble x z else ble y w
 | (mul _ _) _         := tt
 | _         (mul _ _) := ff
 | (pow x n) (pow y m) := if x = y then n ≤ m else ble x y

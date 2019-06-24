@@ -70,6 +70,10 @@ theorem eval_def {x : @alt γ _ tt} :
   eval ρ x = nterm.eval ρ x.to_nterm :=
 by {cases x, simp [eval, to_nterm, sterm.eval_to_nterm]}
 
+theorem eval_of_const {b} {c : γ} :
+  eval ρ (of_const c : @alt γ _ b) = (c : α) :=
+by cases b; simp [of_const, eval, pterm.eval_of_const, sterm.eval_of_const]
+
 theorem eval_singleton {b} {x : @nterm γ _} :
   eval ρ (singleton x : @alt γ _ b) = nterm.eval ρ x :=
 begin
@@ -250,7 +254,7 @@ theorem eval_of_nterm {x : @nterm γ _} :
 begin
   induction x with i c x y ihx ihy x y ihx ihy x n ihx,
   { intro, unfold of_nterm, rw eval_singleton, refl },
-  { intro, unfold of_nterm, sorry },
+  { intro, unfold of_nterm, rw eval_of_const, simp [nterm.eval] },
   { unfold of_nterm, intro H,
     rw [hyps_add,  nonzero_union] at H,
     rw [eval_add, ihx, ihy],
@@ -300,56 +304,55 @@ begin
   { intros t ht, apply H, apply alt.hyps_to_sform, exact ht }
 end
 
-section soundness
-
-variables {x y : @nterm γ _} {i : num} {n : znum} {c : γ}
-
-theorem sound_atom : @norm γ _ i = i :=
-begin
-  sorry
-end
-
-theorem sound_const : @norm γ _ c = c :=
-begin
-  sorry
-end
-
-theorem sound_add :
-  norm (x + y) = (sterm.of_nterm x.norm
-    + sterm.of_nterm y.norm).to_nterm :=
-begin
-  sorry
-end
-
-theorem sound_mul :
-  norm (x * y) = (pterm.of_nterm x.norm
-    * pterm.of_nterm y.norm).reduce.to_nterm :=
-begin
-  sorry
-end
-
-theorem sound_pow :
-  norm (x ^ n) = (pterm.of_nterm x.norm ^ n).reduce.to_nterm :=
-begin
-  sorry
-end
-
-def naive_norm : @nterm γ _ → @nterm γ _
-| (add x y) := (sterm.of_nterm (naive_norm x) + sterm.of_nterm (naive_norm y)).to_nterm
-| (mul x y) := (pterm.of_nterm (naive_norm x) * pterm.of_nterm (naive_norm y)).reduce.to_nterm
-| (pow x n) := (pterm.of_nterm (naive_norm x) ^ n).reduce.to_nterm
-| x := x
-
-theorem soundness {x : @nterm γ _} :
-  norm x = naive_norm x :=
-begin
-  sorry
-  --TODO: this theorem is not required,
-  --but it could be an interesting
-  --first step to prove soundness
-end
-
-end soundness
+--section soundness
+--variables {x y : @nterm γ _} {i : num} {n : znum} {c : γ}
+--
+--theorem sound_atom : @norm γ _ i = i :=
+--begin
+--  sorry
+--end
+--
+--theorem sound_const : @norm γ _ c = c :=
+--begin
+--  sorry
+--end
+--
+--theorem sound_add :
+--  norm (x + y) = (sterm.of_nterm x.norm
+--    + sterm.of_nterm y.norm).to_nterm :=
+--begin
+--  sorry
+--end
+--
+--theorem sound_mul :
+--  norm (x * y) = (pterm.of_nterm x.norm
+--    * pterm.of_nterm y.norm).reduce.to_nterm :=
+--begin
+--  sorry
+--end
+--
+--theorem sound_pow :
+--  norm (x ^ n) = (pterm.of_nterm x.norm ^ n).reduce.to_nterm :=
+--begin
+--  sorry
+--end
+--
+--def naive_norm : @nterm γ _ → @nterm γ _
+--| (add x y) := (sterm.of_nterm (naive_norm x) + sterm.of_nterm (naive_norm y)).to_nterm
+--| (mul x y) := (pterm.of_nterm (naive_norm x) * pterm.of_nterm (naive_norm y)).reduce.to_nterm
+--| (pow x n) := (pterm.of_nterm (naive_norm x) ^ n).reduce.to_nterm
+--| x := x
+--
+--theorem soundness {x : @nterm γ _} :
+--  norm x = naive_norm x :=
+--begin
+--  sorry
+--  --TODO: this theorem is not required,
+--  --but it could be an interesting
+--  --first step to prove soundness
+--end
+--
+--end soundness
 
 end nterm
 
