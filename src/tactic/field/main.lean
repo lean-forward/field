@@ -243,7 +243,29 @@ meta def nterm_to_expr (α : expr) (s : cache_ty) : @nterm γ _ → tactic expr
   a ← nterm_to_expr x,
   to_expr ``(%%a ^ (%%(reflect n) : ℤ))
 
-meta def norm_expr (e : expr) (s : cache_ty) : tactic (expr × expr × cache_ty) :=
+meta def prove_norm_hyps (t : @eterm ℚ _) (s : cache_ty) : tactic (list expr × expr) :=
+do
+  let t_expr : expr := reflect t,
+  ρ ← s.dict_expr,
+
+  let nhyps := norm_hyps t,
+  nhyps ← monad.mapm (nterm_to_expr `(ℝ) s) nhyps,
+  nhyps ← monad.mapm (λ e, to_expr ``(%%e ≠ 0)) nhyps,
+  mvars ← monad.mapm mk_meta_var nhyps,
+
+  h ← to_expr ``(∀ x ∈ norm_hyps %%t_expr, nterm.eval %%ρ x ≠ 0),
+  pe ← to_expr ( mvars.foldr (λ e pe, ``((and.intro %%e %%pe))) ``(trivial) ) tt ff,
+  ((), pr) ← solve_aux h (refine ``(list.pall_iff_forall_prop.mp _) >> exact pe >> done),
+
+  return (mvars, pr)
+
+-- norm_expr e s = (new_e, pr, mv, mvs, new_s)
+-- new_e is the canonized expression
+-- pr is a proof that e = new_e
+-- mv is a meta-variable to prove by reflexivity
+-- mvs are neta-variables for the nonzero hypothesis made by the normalizer
+-- new_s is the updated cache
+meta def norm_expr (e : expr) (s : cache_ty) : tactic (expr × expr × expr × list expr × cache_ty) :=
 do
   let (t, s) := (eterm_of_expr e).run s,
   let t_expr : expr := reflect t,
@@ -251,18 +273,7 @@ do
   norm_t_expr ← to_expr ``(norm %%t_expr),
   ρ_expr ← s.dict_expr,
 
-  --creating mvars and new goals for the assumptions
-  let nhyps := norm_hyps t,
-  nhyps ← monad.mapm (nterm_to_expr `(ℝ) s) nhyps,
-  nhyps ← monad.mapm (λ e, to_expr ``(%%e ≠ 0)) nhyps,
-  mvars ← monad.mapm mk_meta_var nhyps,
-
-  --proving the premise of the correctness theorem using mvars
-  pe ← to_expr $ mvars.foldr (λ e pe, ``((and.intro %%e %%pe))) ``(trivial),
-  --infer_type pe >>= trace,
-  h0 ← to_expr ``(∀ x ∈ norm_hyps %%t_expr, nterm.eval %%ρ_expr x ≠ 0),
-  ((), pr0) ← solve_aux h0
-    (refine ``(list.pall_iff_forall_prop.mp _) >> exact pe >> done),
+  (mvars, pr0) ← prove_norm_hyps t s,
 
   --reflexivity from expr to eterm
   h1 ← to_expr ``(%%e = eterm.eval %%ρ_expr %%t_expr),
@@ -275,12 +286,20 @@ do
   --reflexivity from nterm to expr
   new_e ← nterm_to_expr `(ℝ) s norm_t,
   h3 ← to_expr ``(nterm.eval %%ρ_expr %%norm_t_expr = %%new_e),
-  ((), pr3) ← solve_aux h3 `[refl, done],
+  pr3 ← mk_meta_var h3, --heavy computation in the kernel
 
   pr ← mk_eq_trans pr2 pr3 >>= mk_eq_trans pr1,
-  return (new_e, pr, s)
+  return (new_e, pr, pr3, mvars, s)
 
 end field
+
+meta def prove_by_reflexivity (mvs : list expr) : tactic unit :=
+do
+  gs ← get_goals,
+  set_goals mvs,
+  all_goals reflexivity,
+  set_goals gs
+
 end tactic
 
 open tactic interactive interactive.types lean.parser
@@ -289,10 +308,21 @@ open tactic.field
 meta def tactic.interactive.field1 : tactic unit :=
 do
   `(%%e1 = %%e2) ← target,
-  (new_e1, pr1, s) ← field.norm_expr e1 ∅,
-  (new_e2, pr2, s) ← norm_expr e2 s,
-  is_def_eq new_e1 new_e2,
 
-  pr ← mk_eq_symm pr2 >>= mk_eq_trans pr1,
-  tactic.exact pr
+  (new_e1, pr1, mv1, mvs, s) ← norm_expr e1 ∅,
+  (new_e2, pr2, mv2, mvs', s) ← norm_expr e2 s,
 
+  ( do
+    is_def_eq new_e1 new_e2,
+    prove_by_reflexivity [mv1, mv2],
+    gs ← get_goals,
+    set_goals (gs ++ mvs ++ mvs'),
+    mk_eq_symm pr2 >>= mk_eq_trans pr1 >>= tactic.exact
+  ) <|> ( do
+    pr0 ← to_expr ``(%%new_e1 = %%new_e2) >>= mk_meta_var,
+    pr ← mk_eq_symm pr2 >>= mk_eq_trans pr0 >>= mk_eq_trans pr1,
+    prove_by_reflexivity [mv1, mv2],
+    gs ← get_goals,
+    set_goals (gs ++ [pr0] ++ mvs ++ mvs'),
+    tactic.exact pr
+  )
