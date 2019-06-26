@@ -172,33 +172,23 @@ instance : decidable_rel (@has_le.le γ _) := const_space.dec_le γ
 end const_space
 
 @[derive decidable_eq, derive has_reflect]
-inductive nterm {γ : Type} [const_space γ] : Type
-| atom  : num → nterm
-| const : γ → nterm
-| add   : nterm → nterm → nterm
-| mul   : nterm → nterm → nterm
-| pow   : nterm → znum → nterm
+--TODO: make γ explicit
+inductive nterm (γ : Type) [const_space γ] : Type
+| atom  {} : num → nterm
+| const {} : γ → nterm
+| add   {} : nterm → nterm → nterm
+| mul   {} : nterm → nterm → nterm
+| pow   {} : nterm → znum → nterm
 
 namespace nterm
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
-instance : inhabited (@nterm γ _) := ⟨const 0⟩
-
---inductive le : @nterm γ _ → @nterm γ _ → Prop
---| const_le_const {a b : γ} : a ≤ b → le (const a) (const b)
---| atom_le_atom {i j : num} : i ≤ j → le (atom i) (atom j)
---| add_le_add_1 {x y z w : @nterm γ _} : le y w → le (add x y) (add z w)
---| add_le_add_2 {x y z : @nterm γ _} : le x z → le (add x y) (add z y)
---| mul_le_mul_1 {x y z w : @nterm γ _} : le y w → le (mul x y) (mul z w)
---| mul_le_mul_2 {x y z : @nterm γ _} : le x z → le (mul x y) (mul z y)
---| pow_le_pow_1 {x y : @nterm γ _} {n m : znum} : le x y → le (pow x n) (pow y m)
---| pow_le_pow_2 {x : @nterm γ _} {n m : znum} : n ≤ m → le (pow x n) (pow x m)
---| ... 
+instance : inhabited (nterm γ) := ⟨const 0⟩
 
 def ble :
-  @nterm γ _ → @nterm γ _ → bool
+  nterm γ → nterm γ → bool
 | (const a) (const b) := a ≤ b
 | (const _) _         := tt
 | _         (const _) := ff
@@ -213,10 +203,10 @@ def ble :
 | _         (mul _ _) := ff
 | (pow x n) (pow y m) := if x = y then n ≤ m else ble x y
 
-def le : @nterm γ _ → @nterm γ _ → Prop := λ x y, ble x y
-def lt : @nterm γ _ → @nterm γ _ → Prop := λ x y, ble x y ∧ x ≠ y
-instance : has_le (@nterm γ _) := ⟨le⟩
-instance : has_lt (@nterm γ _) := ⟨lt⟩
+def le : nterm γ → nterm γ → Prop := λ x y, ble x y
+def lt : nterm γ → nterm γ → Prop := λ x y, ble x y ∧ x ≠ y
+instance : has_le (nterm γ) := ⟨le⟩
+instance : has_lt (nterm γ) := ⟨lt⟩
 instance dec_le : decidable_rel (@le γ _) := by dunfold le; apply_instance
 instance dec_lt : decidable_rel (@lt γ _) := by dunfold lt; apply_instance
 
@@ -224,26 +214,26 @@ instance dec_lt : decidable_rel (@lt γ _) := by dunfold lt; apply_instance
 --instance antisymm_le : is_antisymm _ (@le γ _) := by sorry
 --instance is_total : is_total _ (@le γ _) := by sorry
 
-instance coe_atom : has_coe num (@nterm γ _) := ⟨atom⟩
-instance coe_const: has_coe γ (@nterm γ _) := ⟨const⟩
-instance : has_zero (@nterm γ _) := ⟨const 0⟩
-instance : has_one (@nterm γ _) := ⟨const 1⟩
-instance : has_add (@nterm γ _) := ⟨add⟩
-instance : has_mul (@nterm γ _) := ⟨mul⟩
-instance : has_pow (@nterm γ _) znum := ⟨pow⟩
-instance pow_nat : has_pow (@nterm γ _) ℕ := ⟨λ x n, x.pow (n : znum)⟩ --test
-instance pow_int : has_pow (@nterm γ _) ℤ := ⟨λ x n, x.pow (n : znum)⟩ --test
+instance coe_atom : has_coe num (nterm γ) := ⟨atom⟩
+instance coe_const: has_coe γ (nterm γ) := ⟨const⟩
+instance : has_zero (nterm γ) := ⟨const 0⟩
+instance : has_one (nterm γ) := ⟨const 1⟩
+instance : has_add (nterm γ) := ⟨add⟩
+instance : has_mul (nterm γ) := ⟨mul⟩
+instance : has_pow (nterm γ) znum := ⟨pow⟩
+instance pow_nat : has_pow (nterm γ) ℕ := ⟨λ x n, x.pow (n : znum)⟩ --test
+instance pow_int : has_pow (nterm γ) ℤ := ⟨λ x n, x.pow (n : znum)⟩ --test
 
-def neg (x : @nterm γ _) : @nterm γ _ := x * (-1 : γ)
-instance : has_neg (@nterm γ _) := ⟨neg⟩
-def sub (x y : @nterm γ _) : @nterm γ _ := x + (-y)
-instance : has_sub (@nterm γ _) := ⟨sub⟩
-def inv (x : @nterm γ _) : @nterm γ _ := pow x (-1)
-instance : has_inv (@nterm γ _) := ⟨inv⟩
-def div (x y : @nterm γ _) : @nterm γ _ := x * y⁻¹
-instance : has_div (@nterm γ _) := ⟨div⟩
+def neg (x : nterm γ) : nterm γ := x * (-1 : γ)
+instance : has_neg (nterm γ) := ⟨neg⟩
+def sub (x y : nterm γ) : nterm γ := x + (-y)
+instance : has_sub (nterm γ) := ⟨sub⟩
+def inv (x : nterm γ) : nterm γ := pow x (-1)
+instance : has_inv (nterm γ) := ⟨inv⟩
+def div (x y : nterm γ) : nterm γ := x * y⁻¹
+instance : has_div (nterm γ) := ⟨div⟩
 
-def eval (ρ : dict α) : @nterm γ _ → α
+def eval (ρ : dict α) : nterm γ → α
 | (atom i)  := ρ.val i
 | (const c) := ↑c
 | (add x y) := eval x + eval y
@@ -251,11 +241,11 @@ def eval (ρ : dict α) : @nterm γ _ → α
 | (pow x n) := eval x ^ (n : ℤ)
 
 section
-variables {x y : @nterm γ _} {i : num} {n : znum} {c : γ}
-@[simp] theorem eval_zero : (0 : @nterm γ _).eval ρ = 0 := by apply morph.morph0
-@[simp] theorem eval_one : (1 : @nterm γ _).eval ρ = 1 := by apply morph.morph1
-@[simp] theorem eval_atom : (i : @nterm γ _).eval ρ = ρ.val i := rfl
-@[simp] theorem eval_const : (c : @nterm γ _).eval ρ = c := rfl
+variables {x y : nterm γ} {i : num} {n : znum} {c : γ}
+@[simp] theorem eval_zero : (0 : nterm γ).eval ρ = 0 := by apply morph.morph0
+@[simp] theorem eval_one : (1 : nterm γ).eval ρ = 1 := by apply morph.morph1
+@[simp] theorem eval_atom : (i : nterm γ).eval ρ = ρ.val i := rfl
+@[simp] theorem eval_const : (c : nterm γ).eval ρ = c := rfl
 @[simp] theorem eval_add : (x + y).eval ρ = x.eval ρ + y.eval ρ := rfl
 @[simp] theorem eval_mul : (x * y).eval ρ = x.eval ρ * y.eval ρ := rfl
 @[simp] theorem eval_pow : (x ^ n).eval ρ = x.eval ρ ^ (n : ℤ) := rfl
@@ -288,27 +278,27 @@ eval ρ (x / y)
 
 end
 
-meta def to_str [has_to_string γ] : (@nterm γ _) → string
+meta def to_str [has_to_string γ] : (nterm γ) → string
 | (atom i)  := "#" ++ to_string (i : ℕ)
 | (const c) := to_string c
 | (add x y) := "(" ++ to_str x ++ " + " ++ to_str y ++ ")"
 | (mul x y) := "(" ++ to_str x ++ " * " ++ to_str y ++ ")"
 | (pow x n) := to_str x ++ " ^ " ++ to_string (n : ℤ)
 
-meta instance [has_to_string γ] : has_to_string (@nterm γ _) := ⟨to_str⟩
-meta instance [has_to_string γ] : has_to_tactic_format (@nterm γ _) := ⟨λ x, return (to_str x : format)⟩
+meta instance [has_to_string γ] : has_to_string (nterm γ) := ⟨to_str⟩
+meta instance [has_to_string γ] : has_to_tactic_format (nterm γ) := ⟨λ x, return (to_str x : format)⟩
 
-def sum : list (@nterm γ _) → @nterm γ _
-| []      := (0 : @nterm γ _)
+def sum : list (nterm γ) → nterm γ
+| []      := (0 : nterm γ)
 | [x]     := x
 | (x::xs) := sum xs + x
 
-def prod : list (@nterm γ _) → @nterm γ _
-| []      := (1 : @nterm γ _)
+def prod : list (nterm γ) → nterm γ
+| []      := (1 : nterm γ) 
 | [x]     := x
 | (x::xs) := prod xs * x
 
-theorem eval_sum (xs : list (@nterm γ _)) :
+theorem eval_sum (xs : list (nterm γ)) :
   (sum xs).eval ρ = list.sum (xs.map (nterm.eval ρ)) :=
 begin
   induction xs with x0 xs ih,
@@ -318,7 +308,7 @@ begin
     { unfold sum, rw [list.map_cons, list.sum_cons, eval_add, ih, add_comm] }}
 end
 
-theorem eval_prod (xs : list (@nterm γ _)) :
+theorem eval_prod (xs : list (nterm γ)) :
   (prod xs).eval ρ = list.prod (xs.map (nterm.eval ρ)) :=
 begin
   induction xs with x0 xs ih,
@@ -328,10 +318,10 @@ begin
     { unfold prod, rw [list.map_cons, list.prod_cons, eval_mul, ih, mul_comm] }}
 end
 
-def nonzero (ρ : dict α) (ts : list (@nterm γ _)) : Prop :=
+def nonzero (ρ : dict α) (ts : list (nterm γ)) : Prop :=
 ∀ t ∈ ts, nterm.eval ρ t ≠ 0
 
-theorem nonzero_union {xs ys : list (@nterm γ _)} :
+theorem nonzero_union {xs ys : list (nterm γ)} :
 nonzero ρ (xs ∪ ys) ↔ nonzero ρ xs ∧ nonzero ρ ys :=
 begin
   apply iff.intro,
@@ -340,14 +330,14 @@ begin
     {apply h1, apply ht}, {apply h2, apply ht}}
 end
 
-theorem nonzero_subset {xs ys : list (@nterm γ _)} :
+theorem nonzero_subset {xs ys : list (nterm γ)} :
   xs ⊆ ys → nonzero ρ ys → nonzero ρ xs :=
 begin
   intros h1 h2, intros x hx,
   apply h2, apply h1, apply hx
 end
 
-theorem nonzero_iff_zero_not_mem (ts : list (@nterm γ _)) :
+theorem nonzero_iff_zero_not_mem (ts : list (nterm γ)) :
 nonzero ρ ts ↔ (0 : α) ∉ ts.map (nterm.eval ρ) :=
 begin
   apply iff.intro,

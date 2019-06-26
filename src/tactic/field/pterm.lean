@@ -4,27 +4,26 @@ namespace field
 
 open nterm
 
+--@[derive decidable_eq]
+structure xterm (γ : Type) [const_space γ] : Type :=
+(term : nterm γ)
+(exp : znum)
+
+namespace xterm
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
---@[derive decidable_eq]
-structure xterm : Type :=
-(term : @nterm γ _)
-(exp : znum)
-
-namespace xterm
-
-def to_nterm (x : @xterm γ _) : @nterm γ _ :=
+def to_nterm (x : xterm γ) : nterm γ :=
 if x.exp = 0 then x.term / x.term
 else if x.exp = 1 then x.term
 else x.term ^ x.exp
 
-def eval (ρ : dict α) (x : @xterm γ _) : α :=
+def eval (ρ : dict α) (x : xterm γ) : α :=
 let a := nterm.eval ρ x.term in
 if a = 0 then 0 else a ^ (x.exp : ℤ)
 
-def eval_to_nterm {x : @xterm γ _} :
+def eval_to_nterm {x : xterm γ} :
  nterm.eval ρ x.to_nterm = xterm.eval ρ x :=
 begin
   by_cases hx : nterm.eval ρ x.term = 0;
@@ -36,26 +35,26 @@ begin
 end
 
 theorem eval_to_nterm' :
-  @nterm.eval _ _ γ _ _ ρ ∘ xterm.to_nterm = xterm.eval ρ :=
+  nterm.eval ρ ∘ @xterm.to_nterm γ _ = xterm.eval ρ :=
 begin
   unfold function.comp,
   simp [eval_to_nterm]
 end
 
-theorem eval_def {x : @nterm γ _} {n : znum} :
+theorem eval_def {x : nterm γ} {n : znum} :
   xterm.eval ρ ⟨x, n⟩ =
     if nterm.eval ρ x = 0 then 0
     else nterm.eval ρ x ^ (n : ℤ) :=
 rfl
 
-theorem eval_add {x : @nterm γ _} {n m : znum} :
+theorem eval_add {x : nterm γ} {n m : znum} :
   xterm.eval ρ ⟨x, n + m⟩ = xterm.eval ρ ⟨x, n⟩ * xterm.eval ρ ⟨x, m⟩ :=
 begin
   by_cases hx : nterm.eval ρ x = 0;
   simp [xterm.eval, fpow_add, hx]
 end
 
-def pmerge : list (@xterm γ _) → list (@xterm γ _) → list (@xterm γ _)
+def pmerge : list (xterm γ) → list (xterm γ) → list (xterm γ)
 | (x::xs) (y::ys) :=
   if x.term = y.term then
     ⟨x.term, x.exp + y.exp⟩ :: pmerge xs ys
@@ -66,7 +65,7 @@ def pmerge : list (@xterm γ _) → list (@xterm γ _) → list (@xterm γ _)
 | xs [] := xs
 | [] ys := ys
 
-lemma pmerge_nil_left {ys : list (@xterm γ _)} :
+lemma pmerge_nil_left {ys : list (xterm γ)} :
   pmerge [] ys = ys :=
 begin
   induction ys with y ys ih,
@@ -74,7 +73,7 @@ begin
   { unfold pmerge }
 end
 
-lemma pmerge_nil_right {xs : list (@xterm γ _)} :
+lemma pmerge_nil_right {xs : list (xterm γ)} :
   pmerge xs [] = xs :=
 begin
   induction xs with x xs ih,
@@ -82,20 +81,20 @@ begin
   { unfold pmerge }
 end
 
-lemma pmerge_def1 {x y : @xterm γ _} {xs ys : list (@xterm γ _)} :
+lemma pmerge_def1 {x y : xterm γ} {xs ys : list (xterm γ)} :
   x.term = y.term →
   pmerge (x::xs) (y::ys) = ⟨x.term, x.exp + y.exp⟩ :: pmerge xs ys :=
 by intro h; simp [pmerge, h]
-lemma pmerge_def2 {x y : @xterm γ _} {xs ys : list (@xterm γ _)} :
+lemma pmerge_def2 {x y : xterm γ} {xs ys : list (xterm γ)} :
   x.term ≠ y.term → x.term < y.term →
   pmerge (x::xs) (y::ys) = x :: pmerge xs (y :: ys) :=
 by intros h1 h2; simp [pmerge, h1, h2]
-lemma pmerge_def3 {x y : @xterm γ _} {xs ys : list (@xterm γ _)} :
+lemma pmerge_def3 {x y : xterm γ} {xs ys : list (xterm γ)} :
   x.term ≠ y.term → ¬ x.term < y.term →
   pmerge (x::xs) (y::ys) = y :: pmerge (x::xs) ys :=
 by intros h1 h2; simp [pmerge, h1, h2]
 
-theorem eval_pmerge (xs ys : list (@xterm γ _)) :
+theorem eval_pmerge (xs ys : list (xterm γ)) :
   list.prod (list.map (xterm.eval ρ) (pmerge xs ys))
   = list.prod (list.map (xterm.eval ρ) xs)
     * list.prod (list.map (xterm.eval ρ) ys) :=
@@ -122,7 +121,7 @@ begin
           ring }}}}
 end
 
-theorem eval_pow {x : @xterm γ _} {n : znum} :
+theorem eval_pow {x : xterm γ} {n : znum} :
   n ≠ 0 → xterm.eval ρ ⟨x.term, x.exp * n⟩ = xterm.eval ρ x ^ (n : ℤ) :=
 begin
   intro h0,
@@ -132,9 +131,9 @@ begin
   { simp [hx, xterm.eval, fpow_mul] }
 end
 
-theorem eval_prod_pow {xs : list (@xterm γ _)} {n : znum} :
+theorem eval_prod_pow {xs : list (xterm γ)} {n : znum} :
   n ≠ 0 → list.prod (list.map (xterm.eval ρ) xs) ^ (n : ℤ)
-    = list.prod (list.map (λ x : xterm, xterm.eval ρ ⟨x.term, x.exp * n⟩) xs) :=
+    = list.prod (list.map (λ x : xterm γ, xterm.eval ρ ⟨x.term, x.exp * n⟩) xs) :=
 begin
   intro hn,
   induction xs with x xs ih,
@@ -145,33 +144,36 @@ end
 
 end xterm
 
-structure pterm : Type :=
-(terms : list (@xterm γ _))
+structure pterm (γ : Type) [const_space γ] : Type :=
+(terms : list (xterm γ))
 (coeff : γ)
 
 namespace pterm
+variables {α : Type} [discrete_field α]
+variables {γ : Type} [const_space γ]
+variables [morph γ α] {ρ : dict α}
 
-def of_const (a : γ) : @pterm γ _ :=
+def of_const (a : γ) : pterm γ :=
 { terms := [], coeff := a, }
 
-def singleton (x : @nterm γ _) : @pterm γ _ :=
+def singleton (x : nterm γ) : pterm γ :=
 { terms := [⟨x, 1⟩], coeff := 1 }
 
-def eval (ρ : dict α) (P : @pterm γ _) : α :=
+def eval (ρ : dict α) (P : pterm γ) : α :=
 list.prod (P.terms.map (xterm.eval ρ)) * ↑P.coeff
 
 theorem eval_of_const (a : γ) :
   pterm.eval ρ (of_const a) = ↑a :=
 by simp [of_const, pterm.eval, xterm.eval]
 
-theorem eval_singleton (x : @nterm γ _) :
+theorem eval_singleton (x : nterm γ) :
   pterm.eval ρ (singleton x) = nterm.eval ρ x :=
 begin
   by_cases hx : nterm.eval ρ x = 0,
   repeat {simp [singleton, pterm.eval, xterm.eval, hx]}
 end
 
-def mul (P1 P2 : @pterm γ _) : @pterm γ _ :=
+def mul (P1 P2 : pterm γ) : pterm γ :=
 if P1.coeff = 0 ∨ P2.coeff = 0 then
   { terms := [],
     coeff := 0,
@@ -181,7 +183,7 @@ else
     coeff := P1.coeff * P2.coeff,
   }
 
-def pow (P : @pterm γ _) (n : znum) : @pterm γ _ :=
+def pow (P : pterm γ) (n : znum) : pterm γ :=
 if n = 0 then
   of_const 1
 else
@@ -189,10 +191,10 @@ else
     coeff := P.coeff ^ (n : ℤ),
   }
 
-instance : has_mul (@pterm γ _) := ⟨mul⟩
-instance : has_pow (@pterm γ _) znum := ⟨pow⟩
+instance : has_mul (pterm γ) := ⟨mul⟩
+instance : has_pow (pterm γ) znum := ⟨pow⟩
 
-theorem mul_terms {P Q : @pterm γ _} :
+theorem mul_terms {P Q : pterm γ} :
   P.coeff ≠ 0 ∧ Q.coeff ≠ 0 →
   (P * Q).terms = xterm.pmerge P.terms Q.terms :=
 begin
@@ -200,7 +202,7 @@ begin
   simp [has_mul.mul, mul, h]
 end
 
-theorem mul_terms' {P Q : @pterm γ _} :
+theorem mul_terms' {P Q : pterm γ} :
   P.coeff = 0 ∨ Q.coeff = 0 →
   (P * Q).terms = [] :=
 begin
@@ -208,7 +210,7 @@ begin
   simp [has_mul.mul, mul, h]
 end
 
-theorem mul_coeff {P Q : @pterm γ _} :
+theorem mul_coeff {P Q : pterm γ} :
   (P * Q).coeff = P.coeff * Q.coeff :=
 begin
   by_cases h : P.coeff = 0 ∨ Q.coeff = 0,
@@ -218,7 +220,7 @@ begin
   { simp [has_mul.mul, mul, h] }
 end
 
-theorem eval_mul {P Q : @pterm γ _} :
+theorem eval_mul {P Q : pterm γ} :
   pterm.eval ρ (P * Q) = pterm.eval ρ P * pterm.eval ρ Q :=
 begin
   unfold pterm.eval, rw mul_coeff,
@@ -230,16 +232,16 @@ begin
     ring }
 end
 
-theorem pow_def {P : @pterm γ _} {n : znum} :
+theorem pow_def {P : pterm γ} {n : znum} :
   n ≠ 0 → pterm.eval ρ (P.pow n) =
-    list.prod (list.map (λ x : xterm, xterm.eval ρ ⟨x.term, x.exp * n⟩) P.terms) * ↑P.coeff ^ (n : ℤ) :=
+    list.prod (list.map (λ x : xterm γ, xterm.eval ρ ⟨x.term, x.exp * n⟩) P.terms) * ↑P.coeff ^ (n : ℤ) :=
 begin
   intro hn,
   rw [← morph.morph_pow],
   simp [has_pow.pow, pow, hn, pterm.eval]
 end
 
-theorem eval_pow {P : @pterm γ _} {n : znum} :
+theorem eval_pow {P : pterm γ} {n : znum} :
   pterm.eval ρ (P ^ n) = pterm.eval ρ P ^ (n : ℤ) :=
 begin
   by_cases hn : n = 0,
@@ -254,12 +256,12 @@ begin
     { simp [has_pow.pow, pow, hn] }}
 end
 
-def to_nterm (P : @pterm γ _) : @nterm γ _ :=
+def to_nterm (P : pterm γ) : nterm γ :=
 if P.terms.empty then P.coeff
 else if P.coeff = 1 then prod (P.terms.map (xterm.to_nterm))
 else prod (P.terms.map (xterm.to_nterm)) * P.coeff
 
-theorem eval_to_nterm {P : @pterm γ _} :
+theorem eval_to_nterm {P : pterm γ} :
   pterm.eval ρ P = nterm.eval ρ P.to_nterm :=
 begin
   cases P with xs c,
@@ -273,7 +275,7 @@ begin
       rw xterm.eval_to_nterm' }},
   --this is silly TODO
   { have h1' : xs.empty = tt, by { cases xs,
-      { unfold list.empty },
+      { refl },
       { by_contradiction, apply h1, unfold list.empty }},
     cases xs,
     { simp [pterm.eval, nterm.eval, to_nterm, h1'] },
@@ -281,15 +283,15 @@ begin
   }
 end
 
-def reduce (P : @pterm γ _) : @pterm γ _ :=
+def reduce (P : pterm γ) : pterm γ :=
 { terms := P.terms.filter (λ x, x.exp ≠ 0),
   coeff := P.coeff
 }
 
-def reduce_hyps (P : @pterm γ _) : list (@nterm γ _) :=
+def reduce_hyps (P : pterm γ) : list (nterm γ) :=
 list.map xterm.term (P.terms.filter (λ x, x.exp = 0))
 
-private lemma lemma_eval_reduce {x : @xterm γ _} :
+private lemma lemma_eval_reduce {x : xterm γ} :
   x.exp = 0 ∧ nterm.eval ρ x.term ≠ 0 →
   xterm.eval ρ x = 1 :=
 begin
@@ -299,14 +301,14 @@ begin
   simp [xterm.eval, hn, hx]
 end
 
-theorem eval_reduce {P : @pterm γ _} :
+theorem eval_reduce {P : pterm γ} :
   nonzero ρ P.reduce_hyps →
   pterm.eval ρ P = pterm.eval ρ P.reduce :=
 begin
   intro H,
-  have H1 : ∀ x : xterm, x ∈ P.terms → x.exp = 0 → nterm.eval ρ (x.term) ≠ 0,
+  have H1 : ∀ x : xterm γ, x ∈ P.terms → x.exp = 0 → nterm.eval ρ (x.term) ≠ 0,
   by { intros x h1 h2, apply H, simp [reduce_hyps], existsi x, simp [h1, h2] },
-  have H2 : ∀ x : xterm, x ∈ P.terms.filter (λ x, x.exp = 0) → nterm.eval ρ (x.term) ≠ 0,
+  have H2 : ∀ x : xterm γ, x ∈ P.terms.filter (λ x, x.exp = 0) → nterm.eval ρ (x.term) ≠ 0,
   by { intros x hx, have : x ∈ P.terms ∧ x.exp = 0, from list.mem_filter.mp hx,
        cases this, apply H1; assumption },
 
@@ -335,13 +337,13 @@ begin
   simp [reduce, list.prod_ones this]
 end
 
-def of_nterm : @nterm γ _ → @pterm γ _
+def of_nterm : nterm γ → pterm γ
 | (nterm.mul x y) := of_nterm x * of_nterm y
 | (nterm.pow x n) := of_nterm x ^ n
 | (nterm.const a) := of_const a
 | x := singleton x
 
-theorem eval_of_nterm {x : @nterm γ _} :
+theorem eval_of_nterm {x : nterm γ} :
   pterm.eval ρ (of_nterm x) = nterm.eval ρ x :=
 begin
   induction x with i c x y ihx ihy x y ihx ihy x n ihx,

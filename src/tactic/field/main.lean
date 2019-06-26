@@ -37,27 +37,28 @@ end list
 --end finmap
 
 namespace field
+
+@[derive decidable_eq, derive has_reflect]
+inductive eterm (γ : Type) [const_space γ] : Type
+| zero  {} : eterm
+| one   {} : eterm
+| const {} : γ → eterm
+| atom  {} : num → eterm
+| add   {} : eterm → eterm → eterm
+| sub   {} : eterm → eterm → eterm
+| mul   {} : eterm → eterm → eterm
+| div   {} : eterm → eterm → eterm
+| neg   {} : eterm → eterm
+| inv   {} : eterm → eterm
+| pow   {} : eterm → ℤ → eterm
+
+namespace eterm
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
-@[derive decidable_eq, derive has_reflect]
-inductive eterm {γ} [const_space γ] : Type
-| zero  : eterm
-| one   : eterm
-| const : γ → eterm
-| atom  : num → eterm
-| add   : eterm → eterm → eterm
-| sub   : eterm → eterm → eterm
-| mul   : eterm → eterm → eterm
-| div   : eterm → eterm → eterm
-| neg   : eterm → eterm
-| inv   : eterm → eterm
-| pow   : eterm → ℤ → eterm
 
-namespace eterm
-
-def eval (ρ : dict α) : @eterm γ _ → α
+def eval (ρ : dict α) : eterm γ → α
 | zero      := 0
 | one       := 1
 | (const r) := ↑r
@@ -70,7 +71,7 @@ def eval (ρ : dict α) : @eterm γ _ → α
 | (inv x)   := (eval x)⁻¹
 | (pow x n) := eval x ^ n
 
-def to_nterm : @eterm γ _ → @nterm γ _
+def to_nterm : eterm γ → nterm γ
 | zero      := 0
 | one       := 1
 | (const c) := c
@@ -83,7 +84,7 @@ def to_nterm : @eterm γ _ → @nterm γ _
 | (inv x)   := (to_nterm x)⁻¹
 | (pow x n) := to_nterm x ^ (n : znum)
 
-theorem correctness {x : @eterm γ _} :
+theorem correctness {x : eterm γ} :
   nterm.eval ρ (to_nterm x) = eval ρ x :=
 begin
   induction x with
@@ -104,13 +105,19 @@ end
 
 end eterm
 
-def norm (x : @eterm γ _) : @nterm γ _ :=
+section norm
+
+variables {α : Type} [discrete_field α]
+variables {γ : Type} [const_space γ]
+variables [morph γ α] {ρ : dict α}
+
+def norm (x : eterm γ) : nterm γ :=
 x.to_nterm.norm
 
-def norm_hyps (x : @eterm γ _) : list (@nterm γ _) :=
+def norm_hyps (x : eterm γ) : list (nterm γ) :=
 x.to_nterm.norm_hyps
 
-theorem correctness {x : @eterm γ _} {ρ : dict α} :
+theorem correctness {x : eterm γ} {ρ : dict α} :
   (∀ t ∈ norm_hyps x, nterm.eval ρ t ≠ 0) →
   eterm.eval ρ x = nterm.eval ρ (norm x) :=
 begin
@@ -121,6 +128,8 @@ begin
     intros t ht, apply H, exact ht },
   { apply eterm.correctness }
 end
+
+end norm
 
 end field
 
@@ -186,7 +195,7 @@ meta def aux_num : expr → option ℤ
 | `(- %%a)                   := has_neg.neg <$> aux_num a
 | _                          := none
 
-meta def eterm_of_expr : expr → state_dict (@eterm γ _) | e :=
+meta def eterm_of_expr : expr → state_dict (eterm γ) | e :=
 match e with
 | `(0 : ℝ) := return zero
 | `(1 : ℝ) := return one
@@ -225,7 +234,7 @@ match e with
 | _ := atom <$> get_atom e
 end
 
-meta def nterm_to_expr (α : expr) (s : cache_ty) : @nterm γ _ → tactic expr
+meta def nterm_to_expr (α : expr) (s : cache_ty) : nterm γ → tactic expr
 | (nterm.atom i)  := do
   e ← s.dict.find i,
   return e
@@ -243,7 +252,7 @@ meta def nterm_to_expr (α : expr) (s : cache_ty) : @nterm γ _ → tactic expr
   a ← nterm_to_expr x,
   to_expr ``(%%a ^ (%%(reflect n) : ℤ))
 
-meta def prove_norm_hyps (t : @eterm ℚ _) (s : cache_ty) : tactic (list expr × expr) :=
+meta def prove_norm_hyps (t : eterm ℚ) (s : cache_ty) : tactic (list expr × expr) :=
 do
   let t_expr : expr := reflect t,
   ρ ← s.dict_expr,
@@ -265,7 +274,8 @@ do
 -- mv is a meta-variable to prove by reflexivity
 -- mvs are neta-variables for the nonzero hypothesis made by the normalizer
 -- new_s is the updated cache
-meta def norm_expr (e : expr) (s : cache_ty) : tactic (expr × expr × expr × list expr × cache_ty) :=
+meta def norm_expr (e : expr) (s : cache_ty) :
+  tactic (expr × expr × expr × list expr × cache_ty) :=
 do
   let (t, s) := (eterm_of_expr e).run s,
   let t_expr : expr := reflect t,
