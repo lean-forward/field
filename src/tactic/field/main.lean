@@ -57,7 +57,6 @@ variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
-
 def eval (ρ : dict α) : eterm γ → α
 | zero      := 0
 | one       := 1
@@ -140,17 +139,21 @@ namespace field
 open field field.eterm
 
 meta structure cache_ty :=
-(new_atom : num)
-(atoms : rb_map expr num)
-(dict: rb_map num expr)
+( new_atom : num )
+( atoms : rb_map expr num )
+( dict: rb_map num expr )
 
 meta instance : has_emptyc cache_ty :=
 ⟨⟨0, rb_map.mk _ _, rb_map.mk _ _⟩⟩
 
-meta def state_dict : Type → Type := state cache_ty
+meta def state_dict : Type → Type := state_t cache_ty tactic
 
-meta instance state_dict_monad : monad state_dict := state_t.monad
-meta instance state_dict_monad_state : monad_state cache_ty state_dict := state_t.monad_state
+namespace state_dict
+meta instance : monad state_dict := state_t.monad
+meta instance : monad_state cache_ty state_dict := state_t.monad_state
+meta instance : alternative state_dict := state_t.alternative
+meta instance {α} : has_coe (tactic α) (state_dict α) := ⟨state_t.lift⟩
+end state_dict
 
 meta def get_atom (e : expr) : state_dict num :=
 get >>= λ s,
@@ -176,81 +179,68 @@ instance : const_space γ :=
   dec_le := by apply_instance,
 }
 
-meta def aux_const : expr → option γ
-| `(@has_zero.zero %%α %%s)  := some 0
-| `(@has_one.one %%α %%s)    := some 1
-| `(@bit0 %%α %%s %%v)       := bit0 <$> aux_const v
-| `(@bit1 %%α %%s₁ %%s₂ %%v) := bit1 <$> aux_const v
-| `(%%a / %%b)               := do
-    x ← aux_const a,
-    y ← aux_const b,
-    return (x / y)
-| _                          := none
-
-meta def aux_num : expr → option ℤ
-| `(@has_zero.zero %%α %%s)  := some 0
-| `(@has_one.one %%α %%s)    := some 1
-| `(@bit0 %%α %%s %%v)       := bit0 <$> aux_num v
-| `(@bit1 %%α %%s₁ %%s₂ %%v) := bit1 <$> aux_num v
-| `(- %%a)                   := has_neg.neg <$> aux_num a
-| _                          := none
-
 meta def eterm_of_expr : expr → state_dict (eterm γ) | e :=
 match e with
 | `(0 : ℝ) := return zero
 | `(1 : ℝ) := return one
-| `(%%a + %%b) := do
-    y ← eterm_of_expr b,
-    x ← eterm_of_expr a,
-    return (add x y)
-| `(%%a - %%b) := do
-    y ← eterm_of_expr b,
-    x ← eterm_of_expr a,
-    return (sub x y)
-| `(%%a * %%b) := do
-    y ← eterm_of_expr b,
-    x ← eterm_of_expr a,
-    return (mul x y)
-| `(%%a / %%b) := do
-    y ← eterm_of_expr b,
-    x ← eterm_of_expr a,
-    return (div x y)
-| `(-%%a) := do
-    x ← eterm_of_expr a,
-    return (neg x)
-| `((%%a)⁻¹) := do
-    x ← eterm_of_expr a,
-    return (inv x)
-| `(%%a ^ %%n) :=
-    match aux_num n with
-    | (some n) := (λ x, pow x n) <$> eterm_of_expr a
-    | none     := atom <$> get_atom e
-    end
-| `(↑%%e) :=
-    match aux_const e with
-    | (some n) := return (const n)
-    | none     := atom <$> get_atom e
-    end
-| _ := atom <$> get_atom e
+| `(%%a + %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (add x y)
+| `(%%a - %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (sub x y)
+| `(%%a * %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (mul x y)
+| `(%%a / %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (div x y)
+| `(-%%a)      := do x ← eterm_of_expr a, return (neg x)
+| `((%%a)⁻¹)   := do x ← eterm_of_expr a, return (inv x)
+| `(%%a ^ %%b) := do n ← eval_expr ℤ b <|> (coe <$> eval_expr ℕ b), x ← eterm_of_expr a, return (pow x n)
+| `(↑%%a)      := do c ← eval_expr γ a, return (const c)
+| _ := failure
+--| `(@has_coe.coe ℚ ℝ %%h %%a) := do c ← eval_expr γ a, return (const c)
+end
+
+--private meta def znum_of_expr : expr → option znum
+--| `(@has_zero.zero %%α %%s)   := some 0
+--| `(@has_one.one %%α %%s)     := some 1
+--| `(@bit0 %%α %%s %%v)        := bit0 <$> znum_of_expr v
+--| `(@bit1 %%α %%s1 %%s2 %%v)  := bit1 <$> znum_of_expr v
+--| `(@has_neg.neg %%α %%s %%a) := has_neg.neg <$> znum_of_expr a
+--| _                           := none <|> do i ← get_atom e, return (atom i)
+
+private meta def pexpr_of_pos_num (α h_one h_add : expr) : pos_num → pexpr
+| pos_num.one := ``(@has_one.one %%α %%h_one)
+| (pos_num.bit0 n) := ``(@bit0 %%α %%h_add (%%(pexpr_of_pos_num n)))
+| (pos_num.bit1 n) := ``(@bit1 %%α %%h_one %%h_add (%%(pexpr_of_pos_num n)))
+
+private meta def expr_of_num (α : expr) (n : num) : tactic expr :=
+match n with
+| num.zero := do
+  h_zero ← mk_app `has_zero [α] >>= mk_instance',
+  to_expr ``(@has_zero.zero %%α %%h_zero)
+| (num.pos (pos_num.one)) := do
+  h_one ← mk_app `has_one [α] >>= mk_instance',
+  to_expr ``(@has_one.one %%α %%h_one)
+| (num.pos m) := do
+  h_one ← mk_app `has_one [α] >>= mk_instance',
+  h_add ← mk_app `has_add [α] >>= mk_instance',
+  to_expr (pexpr_of_pos_num α h_one h_add m)
+end
+
+private meta def expr_of_znum (α : expr) (n : znum) : tactic expr :=
+match n with
+| znum.zero := do
+  h_zero ← mk_app `has_zero [α] >>= mk_instance',
+  to_expr ``(@has_zero.zero %%α %%h_zero)
+| (znum.pos n) :=
+  expr_of_num α (num.pos n)
+| (znum.neg n) := do
+  h_neg ← mk_app `has_neg [α] >>= mk_instance',
+  e ← expr_of_num α (num.pos n),
+  to_expr ``(@has_neg.neg %%α %%h_neg %%e)
 end
 
 meta def nterm_to_expr (α : expr) (s : cache_ty) : nterm γ → tactic expr
-| (nterm.atom i)  := do
-  e ← s.dict.find i,
-  return e
-| (nterm.const c) := do
-  to_expr ``(%%(reflect c) : %%α)
-| (nterm.add x y) := do
-  a ← nterm_to_expr x,
-  b ← nterm_to_expr y,
-  to_expr ``(%%a + %%b)
-| (nterm.mul x y) := do
-  a ← nterm_to_expr x,
-  b ← nterm_to_expr y,
-  to_expr ``(%%a * %%b)
-| (nterm.pow x n) := do
-  a ← nterm_to_expr x,
-  to_expr ``(%%a ^ (%%(reflect n) : ℤ))
+| (nterm.atom i)  := s.dict.find i
+| (nterm.const c) := to_expr ``(%%(rat.reflect c) : %%α)
+| (nterm.add x y) := do a ← nterm_to_expr x, b ← nterm_to_expr y, to_expr ``(%%a + %%b)
+| (nterm.mul x y) := do a ← nterm_to_expr x, b ← nterm_to_expr y, to_expr ``(%%a * %%b)
+| (nterm.pow x n) := do a ← nterm_to_expr x, b ← expr_of_znum `(ℤ) n, to_expr ``(%%a ^ %%b)
 
 meta def prove_norm_hyps (t : eterm ℚ) (s : cache_ty) : tactic (list expr × expr) :=
 do
@@ -277,7 +267,7 @@ do
 meta def norm_expr (e : expr) (s : cache_ty) :
   tactic (expr × expr × expr × list expr × cache_ty) :=
 do
-  let (t, s) := (eterm_of_expr e).run s,
+  (t, s) ← (eterm_of_expr e).run s,
   let t_expr : expr := reflect t,
   let norm_t := norm t,
   norm_t_expr ← to_expr ``(norm %%t_expr),
