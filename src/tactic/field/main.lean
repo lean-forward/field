@@ -193,7 +193,7 @@ match e with
 | `(↑%%a)      := do c ← eval_expr γ a, return (const c)
 | _ := failure
 --| `(@has_coe.coe ℚ ℝ %%h %%a) := do c ← eval_expr γ a, return (const c)
-end
+end <|> do i ← get_atom e, return (atom i)
 
 --private meta def znum_of_expr : expr → option znum
 --| `(@has_zero.zero %%α %%s)   := some 0
