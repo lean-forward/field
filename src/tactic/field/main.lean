@@ -140,8 +140,8 @@ open field field.eterm
 
 meta structure cache_ty :=
 ( new_atom : num )
-( atoms : rb_map expr num )
-( dict: rb_map num expr )
+( atoms    : rb_map expr num )
+( dict     : rb_map num expr )
 
 meta instance : has_emptyc cache_ty :=
 ⟨⟨0, rb_map.mk _ _, rb_map.mk _ _⟩⟩

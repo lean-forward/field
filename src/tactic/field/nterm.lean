@@ -7,9 +7,6 @@ local attribute [semireducible] reflected
 meta instance rat.reflect : has_reflect ℚ
 | ⟨n, d, _, _⟩ := `(rat.mk_nat %%(reflect n) %%(reflect d))
 
-meta instance rat.to_pexpr : has_to_pexpr ℚ :=
-⟨λ ⟨n, d, _, _⟩, ``(rat.mk_nat %%(reflect n) %%(reflect d))⟩
-
 end
 
 meta def tactic.interactive.intros' : tactic unit :=
@@ -348,4 +345,3 @@ end
 end nterm
 
 end field
-
