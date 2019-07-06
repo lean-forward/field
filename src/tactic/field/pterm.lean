@@ -257,30 +257,37 @@ begin
 end
 
 def to_nterm (P : pterm γ) : nterm γ :=
-if P.terms.empty then P.coeff
-else if P.coeff = 1 then prod (P.terms.map (xterm.to_nterm))
-else prod (P.terms.map (xterm.to_nterm)) * P.coeff
+--if P.terms.empty then P.coeff
+--else if P.coeff = 1 then prod (P.terms.map (xterm.to_nterm))
+--else prod (P.terms.map xterm.to_nterm) * P.coeff
+prod (P.terms.map xterm.to_nterm) * P.coeff
 
 theorem eval_to_nterm {P : pterm γ} :
   pterm.eval ρ P = nterm.eval ρ P.to_nterm :=
 begin
+  --cases P with xs c,
+  --by_cases h1 : xs.empty = ff,
+  --{ by_cases h2 : c = 1,
+  --  { rw h2, simp [pterm.eval, to_nterm, h1, eval_prod, xterm.eval_to_nterm'] },
+  --  { suffices : list.prod (list.map (xterm.eval ρ) xs) * ↑c =
+  --      nterm.eval ρ (prod (list.map xterm.to_nterm xs)) * ↑c,
+  --    by { simp [to_nterm, pterm.eval, this, h1, h2] },
+  --    rw [eval_prod, list.map_map],
+  --    rw xterm.eval_to_nterm' }},
+  ----this is silly TODO
+  --{ have h1' : xs.empty = tt, by { cases xs,
+  --    { refl },
+  --    { by_contradiction, apply h1, unfold list.empty }},
+  --  cases xs,
+  --  { simp [pterm.eval, nterm.eval, to_nterm, h1'] },
+  --  { by_contradiction, apply h1, unfold list.empty }
+  --}
   cases P with xs c,
-  by_cases h1 : xs.empty = ff,
-  { by_cases h2 : c = 1,
-    { rw h2, simp [pterm.eval, to_nterm, h1, eval_prod, xterm.eval_to_nterm'] },
-    { suffices : list.prod (list.map (xterm.eval ρ) xs) * ↑c =
-        nterm.eval ρ (prod (list.map xterm.to_nterm xs)) * ↑c,
-      by { simp [to_nterm, pterm.eval, this, h1, h2] },
-      rw [eval_prod, list.map_map],
-      rw xterm.eval_to_nterm' }},
-  --this is silly TODO
-  { have h1' : xs.empty = tt, by { cases xs,
-      { refl },
-      { by_contradiction, apply h1, unfold list.empty }},
-    cases xs,
-    { simp [pterm.eval, nterm.eval, to_nterm, h1'] },
-    { by_contradiction, apply h1, unfold list.empty }
-  }
+  suffices : list.prod (list.map (xterm.eval ρ) xs) * ↑c =
+    nterm.eval ρ (prod (list.map xterm.to_nterm xs)) * ↑c,
+  by { simp [to_nterm, pterm.eval, this] },
+  rw [eval_prod, list.map_map],
+  rw xterm.eval_to_nterm'
 end
 
 def reduce (P : pterm γ) : pterm γ :=
