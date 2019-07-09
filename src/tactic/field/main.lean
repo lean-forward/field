@@ -1,4 +1,4 @@
-import .norm
+import .nterm
 
 namespace list
 
@@ -50,9 +50,11 @@ inductive eterm (γ : Type) [const_space γ] : Type
 | div   {} : eterm → eterm → eterm
 | neg   {} : eterm → eterm
 | inv   {} : eterm → eterm
-| pow   {} : eterm → ℤ → eterm
+| pow_nat {} : eterm → ℕ → eterm
+| pow_int {} : eterm → ℤ → eterm
 
 namespace eterm
+
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
@@ -68,7 +70,8 @@ def eval (ρ : dict α) : eterm γ → α
 | (div x y) := (eval x) / (eval y)
 | (neg x)   := - eval x
 | (inv x)   := (eval x)⁻¹
-| (pow x n) := eval x ^ n
+| (pow_nat x n) := eval x ^ n
+| (pow_int x n) := eval x ^ n
 
 def to_nterm : eterm γ → nterm γ
 | zero      := 0
@@ -81,7 +84,8 @@ def to_nterm : eterm γ → nterm γ
 | (div x y) := to_nterm x / to_nterm y
 | (neg x)   := - to_nterm x
 | (inv x)   := (to_nterm x)⁻¹
-| (pow x n) := to_nterm x ^ (n : znum)
+| (pow_nat x n) := to_nterm x ^ n
+| (pow_int x n) := to_nterm x ^ n
 
 theorem correctness {x : eterm γ} :
   nterm.eval ρ (to_nterm x) = eval ρ x :=
@@ -95,11 +99,11 @@ begin
     x y ihx ihy --div
     x ihx       --neg
     x ihx       --inv
-    x n ihx;    --pow
-  unfold to_nterm; unfold eterm.eval,
+    x n ihx,    --pow
+  repeat {unfold to_nterm, unfold eval},
   repeat { simp },
   repeat { simp [ihx] },
-  repeat { simp [ihx, ihy] }
+  repeat { simp [ihx, ihy] },
 end
 
 end eterm
@@ -111,21 +115,16 @@ variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
 def norm (x : eterm γ) : nterm γ :=
-x.to_nterm.norm
+x.to_nterm
 
 def norm_hyps (x : eterm γ) : list (nterm γ) :=
-x.to_nterm.norm_hyps
+sorry
 
 theorem correctness {x : eterm γ} {ρ : dict α} :
   (∀ t ∈ norm_hyps x, nterm.eval ρ t ≠ 0) →
   eterm.eval ρ x = nterm.eval ρ (norm x) :=
 begin
-  intro H,
-  unfold norm,
-  apply eq.symm, apply eq.trans,
-  { apply nterm.correctness, unfold nterm.nonzero,
-    intros t ht, apply H, exact ht },
-  { apply eterm.correctness }
+  sorry
 end
 
 end norm
@@ -189,7 +188,15 @@ match e with
 | `(%%a / %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (div x y)
 | `(-%%a)      := do x ← eterm_of_expr a, return (neg x)
 | `((%%a)⁻¹)   := do x ← eterm_of_expr a, return (inv x)
-| `(%%a ^ %%b) := do n ← eval_expr ℤ b <|> (coe <$> eval_expr ℕ b), x ← eterm_of_expr a, return (pow x n)
+| `(%%a ^ %%b) := ( do
+                    n ← eval_expr ℕ b,
+                    x ← eterm_of_expr a,
+                    return (pow_nat x n)
+                  ) <|> ( do
+                    n ← eval_expr ℤ b,
+                    x ← eterm_of_expr a,
+                    return (pow_int x n)
+                  ) 
 | `(↑%%a)      := do c ← eval_expr γ a, return (const c)
 | _ := failure
 --| `(@has_coe.coe ℚ ℝ %%h %%a) := do c ← eval_expr γ a, return (const c)

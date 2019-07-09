@@ -182,8 +182,6 @@ variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
-instance : inhabited (nterm γ) := ⟨const 0⟩
-
 def ble :
   nterm γ → nterm γ → bool
 | (const a) (const b) := a ≤ b
@@ -211,64 +209,12 @@ instance dec_lt : decidable_rel (@lt γ _) := by dunfold lt; apply_instance
 --instance antisymm_le : is_antisymm _ (@le γ _) := by sorry
 --instance is_total : is_total _ (@le γ _) := by sorry
 
-instance coe_atom : has_coe num (nterm γ) := ⟨atom⟩
-instance coe_const: has_coe γ (nterm γ) := ⟨const⟩
-instance : has_zero (nterm γ) := ⟨const 0⟩
-instance : has_one (nterm γ) := ⟨const 1⟩
-instance : has_add (nterm γ) := ⟨add⟩
-instance : has_mul (nterm γ) := ⟨mul⟩
-instance : has_pow (nterm γ) znum := ⟨pow⟩
-instance pow_nat : has_pow (nterm γ) ℕ := ⟨λ x n, x.pow (n : znum)⟩ --test
-instance pow_int : has_pow (nterm γ) ℤ := ⟨λ x n, x.pow (n : znum)⟩ --test
-
-def neg (x : nterm γ) : nterm γ := mul x (const (-1))
-def sub (x y : nterm γ) : nterm γ := add x (neg y)
-def inv (x : nterm γ) : nterm γ := pow x (-1)
-def div (x y : nterm γ) : nterm γ := mul x (inv y)
-
-instance : has_neg (nterm γ) := ⟨neg⟩
-instance : has_sub (nterm γ) := ⟨sub⟩
-instance : has_inv (nterm γ) := ⟨inv⟩
-instance : has_div (nterm γ) := ⟨div⟩
-
 def eval (ρ : dict α) : nterm γ → α
 | (atom i)  := ρ.val i
 | (const c) := ↑c
 | (add x y) := eval x + eval y
 | (mul x y) := eval x * eval y
-| (pow x 0) := if eval x = 0 then 0 else 1
-| (pow x n) := eval x ^ (n : ℤ)
-
-section
-variables {x y : nterm γ} {i : num} {n : znum} {c : γ}
-@[simp] theorem eval_zero : (0 : nterm γ).eval ρ = 0 := by apply morph.morph0
-@[simp] theorem eval_one : (1 : nterm γ).eval ρ = 1 := by apply morph.morph1
-@[simp] theorem eval_atom : (i : nterm γ).eval ρ = ρ.val i := rfl
-@[simp] theorem eval_const : (c : nterm γ).eval ρ = c := rfl
-@[simp] theorem eval_add : (x + y).eval ρ = x.eval ρ + y.eval ρ := rfl
-@[simp] theorem eval_mul : (x * y).eval ρ = x.eval ρ * y.eval ρ := rfl
-@[simp] theorem eval_pow : n ≠ 0 → (x ^ n).eval ρ = x.eval ρ ^ (n : ℤ) :=
-begin
-  intro h,
-  suffices : eval ρ (pow x n) = eval ρ x ^ (n : ℤ),
-  { rw ← this, refl },
-  cases n,
-  { contradiction },
-  { refl }, { refl },
-end
-
-@[simp] theorem eval_neg : (-x).eval ρ = - x.eval ρ :=
-begin
-  suffices : eval ρ (neg x) = - x.eval ρ,
-  { rw ← this, refl },
-  unfold neg, unfold eval,
-  rw [morph.morph_neg, morph.morph1, mul_neg_one]
-end
-@[simp] theorem eval_sub : (x - y).eval ρ = x.eval ρ - y.eval ρ := sorry
-@[simp] theorem eval_inv : (x⁻¹).eval ρ = (x.eval ρ)⁻¹ := sorry
-@[simp] theorem eval_div : (x / y).eval ρ = x.eval ρ / y.eval ρ := sorry
-
-end
+| (pow x n) := if eval x = 0 then 0 else eval x ^ (n : ℤ)
 
 meta def to_str [has_to_string γ] : (nterm γ) → string
 | (atom i)  := "#" ++ to_string (i : ℕ)
@@ -281,33 +227,33 @@ meta instance [has_to_string γ] : has_to_string (nterm γ) := ⟨to_str⟩
 meta instance [has_to_string γ] : has_to_tactic_format (nterm γ) := ⟨λ x, return (to_str x : format)⟩
 
 def sum : list (nterm γ) → nterm γ
-| []      := (0 : nterm γ)
+| []      := const 0
 | [x]     := x
-| (x::xs) := sum xs + x
+| (x::xs) := add (sum xs) x
 
 def prod : list (nterm γ) → nterm γ
-| []      := (1 : nterm γ) 
+| []      := const 1
 | [x]     := x
-| (x::xs) := prod xs * x
+| (x::xs) := mul (prod xs) x
 
 theorem eval_sum (xs : list (nterm γ)) :
   (sum xs).eval ρ = list.sum (xs.map (nterm.eval ρ)) :=
 begin
   induction xs with x0 xs ih,
-  { simp [sum] },
+  { simp [sum, eval] },
   { cases xs with x1 xs,
     { simp [sum] },
-    { unfold sum, rw [list.map_cons, list.sum_cons, eval_add, ih, add_comm] }}
+    { unfold sum, rw [list.map_cons, list.sum_cons, eval, ih, add_comm] }}
 end
 
 theorem eval_prod (xs : list (nterm γ)) :
   (prod xs).eval ρ = list.prod (xs.map (nterm.eval ρ)) :=
 begin
   induction xs with x0 xs ih,
-  { simp [prod] },
+  { simp [prod, eval] },
   { cases xs with x1 xs,
     { simp [prod] },
-    { unfold prod, rw [list.map_cons, list.prod_cons, eval_mul, ih, mul_comm] }}
+    { unfold prod, rw [list.map_cons, list.prod_cons, eval, ih, mul_comm] }}
 end
 
 def nonzero (ρ : dict α) (ts : list (nterm γ)) : Prop :=
@@ -343,16 +289,29 @@ def scale (a : γ) : nterm γ → nterm γ
 
 theorem eval_scale {a : γ} {x : nterm γ} :
   eval ρ (x.scale a) = eval ρ x * a :=
-by sorry
+begin
+  cases x,
+  case mul : x y { 
+    cases y,
+    case const : b {
+      unfold scale, unfold eval,
+      rw [mul_assoc, mul_comm a, morph.morph_mul],
+      refl },
+    repeat { refl }},
+  repeat { refl }
+end
 theorem eval_scale_add {a b : γ} {x : nterm γ} :
   eval ρ (x.scale (a + b)) = eval ρ (x.scale a) + eval ρ (x.scale b) :=
-by sorry
+by rw [eval_scale, eval_scale, eval_scale, morph.morph_add, mul_add]
 theorem eval_scale_zero {x : nterm γ} :
   eval ρ (x.scale 0) = 0 :=
-by sorry
+by rw [eval_scale, morph.morph0, mul_zero]
+theorem eval_scale_one {x : nterm γ} :
+  eval ρ (x.scale 1) = eval ρ x :=
+by rw [eval_scale, morph.morph1, mul_one]
 theorem eval_scale_neg {a : γ} {x : nterm γ} :
   eval ρ (x.scale (-a)) = - eval ρ (x.scale a) :=
-by sorry
+by rw [eval_scale, eval_scale, morph.morph_neg, neg_mul_eq_mul_neg]
 
 def coeff : nterm γ → γ
 | (mul x (const a)) := a
@@ -364,7 +323,16 @@ def term : nterm γ → nterm γ
 theorem eval_term_scale_coeff (x : nterm γ) :
   eval ρ x = eval ρ (scale x.coeff x.term) :=
 begin
-  sorry
+  cases x,
+  case mul : x y { 
+    cases y,
+    case const : a {
+      unfold coeff, unfold term,
+      rw eval_scale, refl
+    },
+    repeat {unfold coeff, unfold term, rw eval_scale_one},
+  },
+  repeat {unfold coeff, unfold term, rw eval_scale_one}
 end
 
 def add0 : option (nterm γ) → nterm γ → nterm γ
@@ -418,15 +386,19 @@ begin
   { unfold add0, unfold eval, rw eval_some}
 end
 
-def split_add : Π (S : nterm γ),
-  { x : option (nterm γ) × nterm γ // r x.fst (some S) }
-| (add x y) := { val := (some x, y), property := r.add }
-| x := { val := (none, x), property := r.none }
+def left : nterm γ → option (nterm γ)
+| (add x y) := some x
+| _ := none
+def right : nterm γ → nterm γ
+| (add x y) := y
+| x := x
 
-theorem eval_split_add (S : nterm γ) :
-  eval ρ S = eval ρ ((split_add S).val.fst : nterm γ) + eval ρ (split_add S).val.snd :=
+theorem eval_add_left_right (S : nterm γ) :
+  eval ρ S = eval ρ (S.left : nterm γ) + eval ρ S.right :=
 begin
-  sorry
+  cases S,
+  case add : x y { unfold left, unfold right, unfold eval, rw eval_some },
+  repeat { unfold left, unfold right, unfold eval, rw [eval_none, zero_add] }
 end
   
 def aux (x y : nterm γ) (s1 s2 s3 : option (nterm γ)) : nterm γ :=
@@ -465,26 +437,30 @@ begin
 end
 
 theorem r_split_add {S : nterm γ} :
-  r (S.split_add.val.fst) (some S) :=
+  r S.left (some S) :=
 begin
   cases S,
   case add : { apply r.add },
   repeat { apply r.none }
 end
 
+meta def dec_tac : tactic unit :=
+`[apply psigma.lex.left, assumption, done]
+<|> `[apply psigma.lex.right, assumption, done]
+
 def norm_sum_aux : option (nterm γ) → option (nterm γ) → option (nterm γ)
 | (some S) (some T) :=
-  have h1 : r S.split_add.val.fst (some S), from r_split_add,
-  have h2 : r T.split_add.val.fst (some T), from r_split_add,
-  some (aux S.split_add.val.snd T.split_add.val.snd
-    (norm_sum_aux S.split_add.val.fst T.split_add.val.fst)
-    (norm_sum_aux S.split_add.val.fst (some T))
-    (norm_sum_aux (some S) T.split_add.val.fst) ) 
+  have h1 : r S.left (some S), from r_split_add,
+  have h2 : r T.left (some T), from r_split_add,
+  let s1 := (norm_sum_aux S.left T.left) in
+  let s2 := (norm_sum_aux S.left (some T)) in
+  let s3 := (norm_sum_aux (some S) T.left) in
+  some (aux S.right T.right s1 s2 s3)
 | none x := x
 | x none := x
 using_well_founded {
     rel_tac := λ _ _, `[exact ⟨psigma.lex r (λ _, r), psigma.lex_wf r_wf (λ _, r_wf)⟩],
-    dec_tac := `[apply psigma.lex.left, assumption, done] <|> `[apply psigma.lex.right, assumption, done]
+    dec_tac := dec_tac
  }
 
 def norm_sum (x y : nterm γ) : nterm γ :=
@@ -496,43 +472,89 @@ by cases x; unfold norm_sum_aux
 lemma norm_sum_aux_def2 {x : option (nterm γ)} :
   norm_sum_aux x none = x :=
 by cases x; unfold norm_sum_aux
-
-#check @norm_sum_aux._main._pack
 lemma norm_sum_aux_def3 : Π {S T : nterm γ},
   norm_sum_aux (some S) (some T) =
-  some (aux S.split_add.val.snd T.split_add.val.snd
-    (norm_sum_aux S.split_add.val.fst T.split_add.val.fst)
-    (norm_sum_aux S.split_add.val.fst (some T))
-    (norm_sum_aux (some S) T.split_add.val.fst) ) :=
-by { intros, unfold norm_sum_aux }
+  some (aux S.right T.right
+    (norm_sum_aux S.left T.left)
+    (norm_sum_aux S.left (some T))
+    (norm_sum_aux (some S) T.left) ) :=
+by { intros, unfold norm_sum_aux, }
 
-theorem foobar : Π (S T : option (nterm γ)),
+theorem eval_norm_sum_aux : Π (S T : option (nterm γ)),
   eval ρ (norm_sum_aux S T : nterm γ) = eval ρ (S : nterm γ) + eval ρ (T : nterm γ)
 | (some S) (some T) :=
-  have h1 : r S.split_add.val.fst (some S), from r_split_add,
-  have h2 : r T.split_add.val.fst (some T), from r_split_add,
-  let foobar1 := foobar S.split_add.val.fst in
-  let foobar2 := foobar (some S) T.split_add.val.fst in
+  have h1 : r S.left (some S), from r_split_add,
+  have h2 : r T.left (some T), from r_split_add,
+  let ih1 := eval_norm_sum_aux S.left in
+  let ih2 := eval_norm_sum_aux (some S) T.left in
   begin
     rw [eval_some, eval_some, norm_sum_aux_def3],
     apply eq.trans,
     { apply foo,
-      { rw [foobar1, eval_some, foobar1],
-        rw [add_assoc, ← eval_split_add],
+      { rw [ih1, eval_some, ih1],
+        rw [add_assoc, ← eval_add_left_right],
         refl },
-      { rw [foobar2, eval_some, foobar1],
-        rw [add_assoc, add_comm _ (eval _ (prod.snd _)), ← add_assoc], 
-        rw [← eval_split_add], refl }},
-    { rw [foobar1, add_assoc, add_assoc, ← add_assoc _ (eval _ (prod.snd _)), ← eval_split_add],
-      rw [add_comm (eval _ T) _, ← add_assoc, ← eval_split_add],
+      { rw [ih2, eval_some, ih1],
+        rw [add_assoc, add_comm _ (eval _ (right _)), ← add_assoc], 
+        rw [← eval_add_left_right], refl }},
+    { rw [ih1, add_assoc, add_assoc, ← add_assoc _ (eval _ (right _)), ← eval_add_left_right],
+      rw [add_comm (eval _ T) _, ← add_assoc, ← eval_add_left_right],
       refl }
   end
 | none x := by rw [norm_sum_aux_def1, eval_none, zero_add]
 | x none := by rw [norm_sum_aux_def2, eval_none, add_zero]
 using_well_founded {
     rel_tac := λ _ _, `[exact ⟨psigma.lex r (λ _, r), psigma.lex_wf r_wf (λ _, r_wf)⟩],
-    dec_tac := `[apply psigma.lex.left, assumption, done] <|> `[apply psigma.lex.right, assumption, done]
+    dec_tac := dec_tac
 }
+
+end nterm
+
+namespace nterm
+variables {α : Type} [discrete_field α]
+variables {γ : Type} [const_space γ]
+variables [morph γ α] {ρ : dict α}
+
+instance coe_atom : has_coe num (nterm γ) := ⟨atom⟩
+instance coe_const: has_coe γ (nterm γ) := ⟨const⟩
+instance : has_zero (nterm γ) := ⟨const 0⟩
+instance : has_one (nterm γ) := ⟨const 1⟩
+instance : has_add (nterm γ) := ⟨sorry⟩
+instance : has_mul (nterm γ) := ⟨sorry⟩
+instance : has_pow (nterm γ) znum := ⟨λ x n, if n = 0 then 1 else sorry⟩
+instance pow_nat : has_pow (nterm γ) ℕ := ⟨λ (x : nterm γ) (n : ℕ), x ^ (n : znum)⟩ --test
+instance pow_int : has_pow (nterm γ) ℤ := ⟨λ (x : nterm γ) (n : ℤ), x ^ (n : znum)⟩ --test
+
+def neg (x : nterm γ) : nterm γ := x * (-1 : γ)
+def sub (x y : nterm γ) : nterm γ := x + neg y
+def inv (x : nterm γ) : nterm γ := x ^ (-1 : znum)
+def div (x y : nterm γ) : nterm γ := x * (inv y)
+
+instance : has_neg (nterm γ) := ⟨neg⟩
+instance : has_sub (nterm γ) := ⟨sub⟩
+instance : has_inv (nterm γ) := ⟨inv⟩
+instance : has_div (nterm γ) := ⟨div⟩
+
+section
+variables {x y : nterm γ} {i : num} {n : znum} {c : γ}
+
+@[simp] theorem eval_zero  : eval ρ (0 : nterm γ) = 0       := by apply morph.morph0
+@[simp] theorem eval_one   : eval ρ (1 : nterm γ) = 1       := by apply morph.morph1
+@[simp] theorem eval_atom  : eval ρ (i : nterm γ) = ρ.val i := rfl
+@[simp] theorem eval_const : eval ρ (c : nterm γ) = c       := rfl
+
+@[simp] theorem eval_add : eval ρ (x + y) = eval ρ x + eval ρ y := sorry
+@[simp] theorem eval_mul : eval ρ (x * y) = eval ρ x * eval ρ y := sorry
+@[simp] theorem eval_pow : eval ρ (x ^ n) = eval ρ x ^ (n : ℤ)  := sorry
+
+@[simp] theorem eval_neg : eval ρ (-x)    = - x.eval ρ          := sorry
+@[simp] theorem eval_sub : eval ρ (x - y) = x.eval ρ - y.eval ρ := sorry
+@[simp] theorem eval_inv : eval ρ (x⁻¹)   = (x.eval ρ)⁻¹        := sorry
+@[simp] theorem eval_div : eval ρ (x / y) = x.eval ρ / y.eval ρ := sorry
+
+@[simp] theorem eval_pow_nat {n : ℕ} : eval ρ (x ^ n) = eval ρ x ^ n := sorry
+@[simp] theorem eval_pow_int {n : ℤ} : eval ρ (x ^ n) = eval ρ x ^ n := sorry
+end
 
 end nterm
 
