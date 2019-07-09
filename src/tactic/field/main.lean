@@ -1,4 +1,4 @@
-import .nterm
+import data.nterm
 
 namespace list
 
