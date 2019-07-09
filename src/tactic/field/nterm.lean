@@ -18,6 +18,16 @@ attribute [squash_cast] znum.cast_zero
 attribute [move_cast] znum.cast_add
 --TODO
 
+namespace option
+
+theorem map_map {α β γ} {f : α → β} {g : β → γ} {x : option α} :
+  option.map g (option.map f x) = option.map (g ∘ f) x :=
+begin
+  sorry
+end
+
+end option
+
 namespace list
 
 theorem filter_perm {α} {p : α → Prop} [decidable_pred p] {l : list α} :
@@ -155,16 +165,16 @@ end morph
 
 class const_space (γ : Type) : Type :=
 (df : discrete_field γ)
-(le : has_le γ)
-(dec_le : decidable_rel le.le)
+(lt : γ → γ → Prop)
+(dec : decidable_rel lt)
 
 namespace const_space
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 
-instance : discrete_field γ := const_space.df γ
-instance : has_le γ := const_space.le γ
-instance : decidable_rel (@has_le.le γ _) := const_space.dec_le γ
+instance discrete_field : discrete_field γ := const_space.df γ
+instance has_lt : has_lt γ := ⟨const_space.lt⟩
+instance decidable_rel : @decidable_rel γ (<) := const_space.dec γ
 
 end const_space
 
@@ -182,27 +192,24 @@ variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
-def ble :
+def blt :
   nterm γ → nterm γ → bool
-| (const a) (const b) := a ≤ b
+| (const a) (const b) := a < b
 | (const _) _         := tt
 | _         (const _) := ff
-| (atom i)  (atom j)  := i ≤ j
+| (atom i)  (atom j)  := i < j
 | (atom _)  _         := tt
 | _         (atom _)  := ff
-| (add x y) (add z w) := if y = w then ble x z else ble y w
+| (add x y) (add z w) := if y = w then blt x z else blt y w
 | (add _ _) _         := tt
 | _         (add _ _) := ff
-| (mul x y) (mul z w) := if y = w then ble x z else ble y w
+| (mul x y) (mul z w) := if y = w then blt x z else blt y w
 | (mul _ _) _         := tt
 | _         (mul _ _) := ff
-| (pow x n) (pow y m) := if x = y then n ≤ m else ble x y
+| (pow x n) (pow y m) := if x = y then n < m else blt x y
 
-def le : nterm γ → nterm γ → Prop := λ x y, ble x y
-def lt : nterm γ → nterm γ → Prop := λ x y, ble x y ∧ x ≠ y
-instance : has_le (nterm γ) := ⟨le⟩
+def lt : nterm γ → nterm γ → Prop := λ x y, blt x y
 instance : has_lt (nterm γ) := ⟨lt⟩
-instance dec_le : decidable_rel (@le γ _) := by dunfold le; apply_instance
 instance dec_lt : decidable_rel (@lt γ _) := by dunfold lt; apply_instance
 
 --instance trans_le : is_trans _ (@le γ _) := by sorry
@@ -283,14 +290,24 @@ begin
   { intro h, simp at h, apply h }
 end
 
-def scale (a : γ) : nterm γ → nterm γ
+def scale (a : γ) (x : nterm γ) : nterm γ :=
+match x with
 | (mul x (const b)) := mul x (const (a * b))
-| x := mul x (const a)
+| x := mul x (const a) --should not happen
+end
+
+def coeff : nterm γ → γ
+| (mul x (const a)) := a
+| x := 1 --should not happen
+
+def term : nterm γ → nterm γ
+| (mul x (const a)) := x
+| x := x --should not happen
 
 theorem eval_scale {a : γ} {x : nterm γ} :
   eval ρ (x.scale a) = eval ρ x * a :=
 begin
-  cases x,
+  unfold scale, cases x,
   case mul : x y { 
     cases y,
     case const : b {
@@ -312,70 +329,69 @@ by rw [eval_scale, morph.morph1, mul_one]
 theorem eval_scale_neg {a : γ} {x : nterm γ} :
   eval ρ (x.scale (-a)) = - eval ρ (x.scale a) :=
 by rw [eval_scale, eval_scale, morph.morph_neg, neg_mul_eq_mul_neg]
+theorem scale_comp {a b : γ} : scale a ∘ scale b = scale (a * b) :=
+begin
+  funext x, cases x,
+  case mul : x y {
+    cases y, case const : a { dsimp [function.comp, scale], rw mul_assoc, refl },
+    repeat { dsimp [function.comp, scale], refl }},
+  repeat { dsimp [function.comp, scale], refl }
+end
 
-def coeff : nterm γ → γ
-| (mul x (const a)) := a
-| x := 1 
-def term : nterm γ → nterm γ
-| (mul x (const a)) := x
-| x := x
-
-theorem eval_term_scale_coeff (x : nterm γ) :
-  eval ρ x = eval ρ (scale x.coeff x.term) :=
+theorem eval_term_coeff (x : nterm γ) :
+  eval ρ x = eval ρ x.term * x.coeff :=
 begin
   cases x,
   case mul : x y { 
     cases y,
-    case const : a {
-      unfold coeff, unfold term,
-      rw eval_scale, refl
-    },
-    repeat {unfold coeff, unfold term, rw eval_scale_one},
+    case const : { unfold coeff, unfold term, refl },
+    repeat { unfold coeff, unfold term, rw [morph.morph1, mul_one] },
   },
-  repeat {unfold coeff, unfold term, rw eval_scale_one}
+  repeat { unfold coeff, unfold term, rw [morph.morph1, mul_one] }
+end
+
+instance : has_coe (option (nterm γ)) (nterm γ) :=
+⟨λ x, x.get_or_else (const 0)⟩
+theorem eval_none : eval ρ ((none : option (nterm γ)) : nterm γ) = 0 :=
+by apply morph.morph0
+theorem eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ x := rfl
+
+def left : nterm γ → option (nterm γ)
+| (add x _) := some x
+| _ := none
+
+def right : nterm γ → (nterm γ)
+| (add _ x) := x
+| x := x
+
+def rest (S : nterm γ) : option (nterm γ) :=
+S.term.left.map (scale S.coeff)
+
+def lead (S : nterm γ) : nterm γ :=
+scale S.coeff S.term.right
+
+theorem eval_left_right (x : nterm γ) :
+  eval ρ x = eval ρ (x.left : nterm γ) + eval ρ x.right :=
+begin
+  cases x,
+  case add : x y { unfold left, unfold right, unfold eval, rw eval_some },
+  repeat { unfold left, unfold right, unfold eval, rw [eval_none, zero_add] }
+end
+
+theorem eval_rest_lead {S : nterm γ} :
+  eval ρ S = eval ρ (S.rest : nterm γ) + eval ρ S.lead :=
+begin
+  rw [eval_term_coeff, eval_left_right, add_mul],
+  congr' 1,
+  { unfold rest, cases (term S),
+    case add : { dsimp [left, option.map], rw [eval_some, eval_some, eval_scale] },
+    repeat { dsimp [left, option.map], rw [eval_none, zero_mul] }},
+  { unfold lead, rw eval_scale }
 end
 
 def add0 : option (nterm γ) → nterm γ → nterm γ
 | (some x) y := add x y
 | none y := y
-
-inductive r : option (nterm γ) → option (nterm γ) → Prop
-| none {x : nterm γ} : r none x
-| add {x y : nterm γ} : r x (add x y)
-
-lemma acc_r_none : @acc (option (nterm γ)) r none :=
-begin
-  apply acc.intro, intros x h, cases h
-end
-
-theorem r_wf : @well_founded (option (nterm γ)) r :=
-begin
-  apply well_founded.intro,
-  intro x, cases x with x,
-  { apply acc_r_none },
-  { induction x,
-    case add : x y ihx ihy {
-      apply acc.intro, intros z h,
-      cases h,
-      { apply acc_r_none },
-      { apply ihx }},
-    repeat {
-      apply acc.intro,
-      intros y h, cases h,
-      apply acc_r_none }}
-end
-
-def sizeof' : option (nterm γ) → ℕ
-| none := 0
-| (some (add x _)) := 1 + sizeof' (some x)
-| (some x) := 1
-
-instance : has_coe (option (nterm γ)) (nterm γ) :=
-⟨λ x, x.get_or_else (const 0)⟩
-
-theorem eval_none : eval ρ ((none : option (nterm γ)) : nterm γ) = 0 :=
-by apply morph.morph0
-theorem eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ x := rfl
 
 theorem eval_add0 {x : option (nterm γ)} {y : nterm γ} :
   eval ρ (add0 x y) = eval ρ (add (x : nterm γ) y) :=
@@ -386,76 +402,126 @@ begin
   { unfold add0, unfold eval, rw eval_some}
 end
 
-def left : nterm γ → option (nterm γ)
-| (add x y) := some x
-| _ := none
-def right : nterm γ → nterm γ
-| (add x y) := y
-| x := x
+inductive r : option (nterm γ) → option (nterm γ) → Prop
+| none {S : nterm γ} : r none (some S)
+| rest {S : nterm γ} : r S.rest (some S)
 
-theorem eval_add_left_right (S : nterm γ) :
-  eval ρ S = eval ρ (S.left : nterm γ) + eval ρ S.right :=
+lemma acc_r_none : @acc (option (nterm γ)) r none :=
 begin
-  cases S,
-  case add : x y { unfold left, unfold right, unfold eval, rw eval_some },
-  repeat { unfold left, unfold right, unfold eval, rw [eval_none, zero_add] }
+  apply acc.intro, intros x h, cases h
 end
-  
-def aux (x y : nterm γ) (s1 s2 s3 : option (nterm γ)) : nterm γ :=
-  if x.term = y.term then
-    if x.coeff + y.coeff = 0 then s1
-    else add0 s1 (x.term.scale (x.coeff + y.coeff))
-  else if lt x.term y.term then
-    add0 s2 x
-  else
-    add0 s3 y
 
-lemma foo {x y : nterm γ} {s1 s2 s3 : option (nterm γ)}
+def g : nterm γ → ℕ
+| (add x _) := 1 + g x
+| (mul x (const _)) := g x
+| _ := 0
+def f : option (nterm γ) → ℕ
+| (some x) := 1 + g x
+| none := 0
+
+theorem g_scale {x : nterm γ} {a : γ} : g (x.scale a) = g x :=
+begin
+  cases x, case mul : x y {
+    cases y, case const : b { refl },
+    repeat { refl }},
+  repeat { refl }
+end
+
+theorem f_none {S : nterm γ} : f (none : option (nterm γ)) < f (some S) :=
+by { unfold f, linarith }
+
+theorem foo {x : option (nterm γ)} {a : γ} : f (option.map (scale a) x) = f x :=
+by { cases x, {refl}, {simp [f, g_scale]} }
+
+theorem f_rest {S : nterm γ} : f S.rest < f (some S) :=
+begin
+  show f S.rest < 1 + g S,
+  unfold rest,
+  cases S,
+  case add : { simp [term, left, coeff, f, g, g_scale], linarith },
+  case mul : x y { rw foo, cases y,
+    case const : { cases x, repeat { simp [term, left, f, g], linarith }},
+    repeat { simp [term, left, f], linarith }},
+  repeat { simp [term, left, f], linarith }
+end
+
+theorem r_wf : @well_founded (option (nterm γ)) r :=
+begin
+  apply subrelation.wf,
+  intros x y h,
+  show f x < f y,
+  cases h, { apply f_none }, { apply f_rest },
+  apply measure_wf
+end
+
+def aux (x y : nterm γ) (s1 s2 s3 : option (nterm γ)) : nterm γ :=
+if x.term = y.term then
+  if x.coeff + y.coeff = 0 then s1
+  else (add0 (s1.map (scale (x.coeff + y.coeff)⁻¹)) x.term).scale (x.coeff + y.coeff)
+else if lt x.term y.term then
+  (add0 (s2.map (scale x.coeff⁻¹)) x.term).scale x.coeff
+else
+  (add0 (s3.map (scale y.coeff⁻¹)) y.term).scale y.coeff
+
+lemma eval_aux {x y : nterm γ} {s1 s2 s3 : option (nterm γ)}
+  ( H0 : x.coeff ≠ 0 ∧ y.coeff ≠ 0)
   ( H1 : eval ρ (s2 : nterm γ) = eval ρ (s1 : nterm γ) + eval ρ y )
   ( H2 : eval ρ (s3 : nterm γ) = eval ρ (s1 : nterm γ) + eval ρ x ) :
   eval ρ (aux x y s1 s2 s3) =  eval ρ (s1 : nterm γ) + eval ρ y + eval ρ x :=
 begin
   unfold aux,
   by_cases h1 : x.term = y.term,
-  { by_cases h2 : x.coeff + y.coeff = 0,
+  { rw [add_assoc, add_comm (eval ρ y)],
+    by_cases h2 : x.coeff + y.coeff = 0,
     { rw [if_pos h1, if_pos h2],
-      rw [eval_term_scale_coeff x, eval_term_scale_coeff y, h1],
-      rw [eq_neg_of_add_eq_zero h2, eval_scale_neg],
-      simp },
-    { rw [if_pos h1, if_neg h2],
-      rw [add_assoc, eval_add0], unfold eval, congr,
-      rw [add_comm, eval_scale_add],
-      rw [← eval_term_scale_coeff, h1, ← eval_term_scale_coeff],
-      refl }},
+      rw [eval_term_coeff x, h1],
+      rw [eval_term_coeff y, ← mul_add, ← morph.morph_add],
+      rw [h2, morph.morph0, mul_zero, add_zero] },
+    { rw [if_pos h1, if_neg h2, eval_scale, eval_add0],
+      unfold eval, rw add_mul, congr' 1,
+      { cases s1,
+        { dsimp [option.map], rw [eval_none, zero_mul] },
+        { dsimp [option.map], rw [eval_some, eval_some, eval_scale],
+          rw [mul_assoc, morph.morph_inv, inv_mul_cancel, mul_one],
+          intro contrad, apply h2, apply morph.morph_inj _ contrad }},
+      { rw [morph.morph_add, mul_add],
+        rw [← eval_term_coeff, h1, ← eval_term_coeff] }}},
   { by_cases h2 : x.term < y.term,
-    { rw [if_neg h1, if_pos h2],
-      rw [eval_add0], unfold eval, rw H1 },
-    { rw [if_neg h1, if_neg h2],
-      rw [eval_add0], unfold eval, rw H2,
-      rw [add_assoc, add_assoc], congr' 1,
-      apply add_comm }}
+    { rw [if_neg h1, if_pos h2, eval_scale, eval_add0],
+      unfold eval, rw add_mul, congr' 1,
+      { convert H1, cases s2,
+        { dsimp [option.map], rw [eval_none, zero_mul] },
+        { dsimp [option.map], rw [eval_some, eval_some, eval_scale],
+          rw [mul_assoc, morph.morph_inv, inv_mul_cancel, mul_one],
+          intro contrad, apply H0.left, apply morph.morph_inj _ contrad }},
+      { rw ← eval_term_coeff }},
+    { rw [if_neg h1, if_neg h2, eval_scale, eval_add0],
+      rw [add_assoc, add_comm (eval ρ y), ← add_assoc],
+      unfold eval, rw add_mul, congr' 1,
+      { convert H2, cases s3,
+        { dsimp [option.map], rw [eval_none, zero_mul] },
+        { dsimp [option.map], rw [eval_some, eval_some, eval_scale],
+          rw [mul_assoc, morph.morph_inv, inv_mul_cancel, mul_one],
+          intro contrad, apply H0.right, apply morph.morph_inj _ contrad }},
+      { rw ← eval_term_coeff }}}
 end
 
-theorem r_split_add {S : nterm γ} :
-  r S.left (some S) :=
-begin
-  cases S,
-  case add : { apply r.add },
-  repeat { apply r.none }
-end
 
 meta def dec_tac : tactic unit :=
 `[apply psigma.lex.left, assumption, done]
 <|> `[apply psigma.lex.right, assumption, done]
 
-def norm_sum_aux : option (nterm γ) → option (nterm γ) → option (nterm γ)
+def norm_add_aux : option (nterm γ) → option (nterm γ) → option (nterm γ)
 | (some S) (some T) :=
-  have h1 : r S.left (some S), from r_split_add,
-  have h2 : r T.left (some T), from r_split_add,
-  let s1 := (norm_sum_aux S.left T.left) in
-  let s2 := (norm_sum_aux S.left (some T)) in
-  let s3 := (norm_sum_aux (some S) T.left) in
-  some (aux S.right T.right s1 s2 s3)
+  have h1 : r S.rest (some S), from r.rest,
+  have h2 : r T.rest (some T), from r.rest,
+  let s1 := (norm_add_aux S.rest T.rest) in
+  let s2 := (norm_add_aux S.rest (some T)) in
+  let s3 := (norm_add_aux (some S) T.rest) in
+  if S.lead.coeff ≠ 0 ∧ T.lead.coeff ≠ 0 then
+    some (aux S.lead T.lead s1 s2 s3)
+  else
+    add S T --should not happen
 | none x := x
 | x none := x
 using_well_founded {
@@ -463,50 +529,56 @@ using_well_founded {
     dec_tac := dec_tac
  }
 
-def norm_sum (x y : nterm γ) : nterm γ :=
-norm_sum_aux (some x) (some y)
+def norm_add (x y : nterm γ) : nterm γ :=
+norm_add_aux (some x) (some y)
 
-lemma norm_sum_aux_def1 {x : option (nterm γ)} :
-  norm_sum_aux none x = x :=
-by cases x; unfold norm_sum_aux
-lemma norm_sum_aux_def2 {x : option (nterm γ)} :
-  norm_sum_aux x none = x :=
-by cases x; unfold norm_sum_aux
-lemma norm_sum_aux_def3 : Π {S T : nterm γ},
-  norm_sum_aux (some S) (some T) =
-  some (aux S.right T.right
-    (norm_sum_aux S.left T.left)
-    (norm_sum_aux S.left (some T))
-    (norm_sum_aux (some S) T.left) ) :=
-by { intros, unfold norm_sum_aux, }
+lemma norm_add_aux_def1 {x : option (nterm γ)} :
+  norm_add_aux none x = x :=
+by cases x; unfold norm_add_aux
+lemma norm_add_aux_def2 {x : option (nterm γ)} :
+  norm_add_aux x none = x :=
+by cases x; unfold norm_add_aux
+lemma norm_add_aux_def3 : Π {S T : nterm γ},
+  S.lead.coeff ≠ 0 ∧ T.lead.coeff ≠ 0 →
+  norm_add_aux (some S) (some T) =
+  some (aux S.lead T.lead
+    (norm_add_aux S.rest T.rest)
+    (norm_add_aux S.rest (some T))
+    (norm_add_aux (some S) T.rest) ) :=
+begin
+  intros S T h0,
+  simp [h0, norm_add_aux]
+end
 
-theorem eval_norm_sum_aux : Π (S T : option (nterm γ)),
-  eval ρ (norm_sum_aux S T : nterm γ) = eval ρ (S : nterm γ) + eval ρ (T : nterm γ)
+theorem eval_norm_add_aux : Π (S T : option (nterm γ)),
+  eval ρ (norm_add_aux S T : nterm γ) = eval ρ (S : nterm γ) + eval ρ (T : nterm γ)
 | (some S) (some T) :=
-  have h1 : r S.left (some S), from r_split_add,
-  have h2 : r T.left (some T), from r_split_add,
-  let ih1 := eval_norm_sum_aux S.left in
-  let ih2 := eval_norm_sum_aux (some S) T.left in
+  have h1 : r S.rest (some S), from r.rest,
+  have h2 : r T.rest (some T), from r.rest,
+  let ih1 := eval_norm_add_aux S.rest in
+  let ih2 := eval_norm_add_aux (some S) T.rest in
   begin
-    rw [eval_some, eval_some, norm_sum_aux_def3],
-    apply eq.trans,
-    { apply foo,
-      { rw [ih1, eval_some, ih1],
-        rw [add_assoc, ← eval_add_left_right],
-        refl },
-      { rw [ih2, eval_some, ih1],
-        rw [add_assoc, add_comm _ (eval _ (right _)), ← add_assoc], 
-        rw [← eval_add_left_right], refl }},
-    { rw [ih1, add_assoc, add_assoc, ← add_assoc _ (eval _ (right _)), ← eval_add_left_right],
-      rw [add_comm (eval _ T) _, ← add_assoc, ← eval_add_left_right],
-      refl }
+    by_cases h0 : S.lead.coeff ≠ 0 ∧ T.lead.coeff ≠ 0,
+    { rw [eval_some, eval_some, norm_add_aux_def3 h0],
+      rw [eval_some, eval_aux h0],
+      { rw [ih1, add_assoc (eval ρ ↑(rest S)), ← eval_rest_lead],
+        rw [add_comm (eval ρ ↑(rest S)), add_assoc, ← eval_rest_lead],
+        apply add_comm },
+      { rw [ih1, ih1, add_assoc, ← eval_rest_lead], refl },
+      { rw [ih2, ih1, add_comm (eval ρ ↑(rest S)), add_assoc, ← eval_rest_lead],
+        apply add_comm }},
+    { simp [norm_add_aux, h0], refl }
   end
-| none x := by rw [norm_sum_aux_def1, eval_none, zero_add]
-| x none := by rw [norm_sum_aux_def2, eval_none, add_zero]
+| none x := by rw [norm_add_aux_def1, eval_none, zero_add]
+| x none := by rw [norm_add_aux_def2, eval_none, add_zero]
 using_well_founded {
     rel_tac := λ _ _, `[exact ⟨psigma.lex r (λ _, r), psigma.lex_wf r_wf (λ _, r_wf)⟩],
     dec_tac := dec_tac
 }
+
+theorem eval_norm_add {x y : nterm γ} :
+  eval ρ (norm_add x y) = eval ρ x + eval ρ y :=
+by apply eval_norm_add_aux
 
 end nterm
 
@@ -519,13 +591,13 @@ instance coe_atom : has_coe num (nterm γ) := ⟨atom⟩
 instance coe_const: has_coe γ (nterm γ) := ⟨const⟩
 instance : has_zero (nterm γ) := ⟨const 0⟩
 instance : has_one (nterm γ) := ⟨const 1⟩
-instance : has_add (nterm γ) := ⟨sorry⟩
+instance : has_add (nterm γ) := ⟨norm_add⟩
 instance : has_mul (nterm γ) := ⟨sorry⟩
 instance : has_pow (nterm γ) znum := ⟨λ x n, if n = 0 then 1 else sorry⟩
 instance pow_nat : has_pow (nterm γ) ℕ := ⟨λ (x : nterm γ) (n : ℕ), x ^ (n : znum)⟩ --test
 instance pow_int : has_pow (nterm γ) ℤ := ⟨λ (x : nterm γ) (n : ℤ), x ^ (n : znum)⟩ --test
 
-def neg (x : nterm γ) : nterm γ := x * (-1 : γ)
+def neg (x : nterm γ) : nterm γ := x.scale (-1)
 def sub (x y : nterm γ) : nterm γ := x + neg y
 def inv (x : nterm γ) : nterm γ := x ^ (-1 : znum)
 def div (x y : nterm γ) : nterm γ := x * (inv y)
@@ -543,11 +615,11 @@ variables {x y : nterm γ} {i : num} {n : znum} {c : γ}
 @[simp] theorem eval_atom  : eval ρ (i : nterm γ) = ρ.val i := rfl
 @[simp] theorem eval_const : eval ρ (c : nterm γ) = c       := rfl
 
-@[simp] theorem eval_add : eval ρ (x + y) = eval ρ x + eval ρ y := sorry
+@[simp] theorem eval_add : eval ρ (x + y) = eval ρ x + eval ρ y := eval_norm_add
 @[simp] theorem eval_mul : eval ρ (x * y) = eval ρ x * eval ρ y := sorry
 @[simp] theorem eval_pow : eval ρ (x ^ n) = eval ρ x ^ (n : ℤ)  := sorry
 
-@[simp] theorem eval_neg : eval ρ (-x)    = - x.eval ρ          := sorry
+@[simp] theorem eval_neg : eval ρ (-x)    = - x.eval ρ          := by { refine eq.trans eval_scale _, rw [morph.morph_neg, morph.morph1, mul_neg_one] }
 @[simp] theorem eval_sub : eval ρ (x - y) = x.eval ρ - y.eval ρ := sorry
 @[simp] theorem eval_inv : eval ρ (x⁻¹)   = (x.eval ρ)⁻¹        := sorry
 @[simp] theorem eval_div : eval ρ (x / y) = x.eval ρ / y.eval ρ := sorry

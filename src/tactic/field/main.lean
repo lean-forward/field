@@ -99,11 +99,12 @@ begin
     x y ihx ihy --div
     x ihx       --neg
     x ihx       --inv
-    x n ihx,    --pow
+    x n ihx     --pow_nat
+    x n ihx,    --pow_int
   repeat {unfold to_nterm, unfold eval},
   repeat { simp },
   repeat { simp [ihx] },
-  repeat { simp [ihx, ihy] },
+  repeat { simp [ihx, ihy] }
 end
 
 end eterm
@@ -174,8 +175,8 @@ def γ := ℚ
 
 instance : const_space γ :=
 { df := by apply_instance,
-  le := by apply_instance,
-  dec_le := by apply_instance,
+  lt := (<),
+  dec := by apply_instance
 }
 
 meta def eterm_of_expr : expr → state_dict (eterm γ) | e :=
