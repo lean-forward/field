@@ -34,6 +34,18 @@ sorry
 theorem eval_mul {x y : nterm γ} : eval ρ (pform.mul x y) = eval ρ x * eval ρ y :=
 by sorry
 
+protected def pow (x : nterm γ) (n : znum) : nterm γ :=
+if n = 0 then const 1 else sorry
+
+--TODO: instace : has_pow α znum
+theorem eval_pow {x : nterm γ} {n : znum} : eval ρ (pform.pow x n) = eval ρ x ^ (n : ℤ) :=
+begin
+  unfold pform.pow,
+  by_cases h : n = 0,
+  { rw [if_pos h, h, znum.cast_zero, fpow_zero], simp [eval] },
+  { rw [if_neg h], sorry }
+end
+
 end pform
 end nterm
 end field
