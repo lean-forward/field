@@ -15,6 +15,17 @@ by apply morph.morph0
 
 private lemma eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ x := rfl
 
+def to_sform : nterm γ → option (nterm γ) | x :=
+if x = const 0 then none else x --TODO
+
+private lemma eval_to_sform {x : nterm γ} : eval ρ (to_sform x : nterm γ) = eval ρ x :=
+begin
+  unfold to_sform,
+  by_cases h1 : x = const 0,
+  { rw [if_pos h1, h1, eval_none], simp [eval] },
+  { rw [if_neg h1], refl }
+end
+
 private def add' : option (nterm γ) → nterm γ → nterm γ
 | (some x) y := add x y
 | none y := y
@@ -233,10 +244,10 @@ using_well_founded {
 }
 
 protected def add (x y : nterm γ) : nterm γ :=
-add_sform (some x) (some y)
+add_sform (to_sform x) (to_sform y)
 
 protected theorem eval_add {x y : nterm γ} : eval ρ (sform.add x y) = eval ρ x + eval ρ y :=
-by apply eval_add_sform
+by { unfold sform.add, rw [eval_add_sform, eval_to_sform, eval_to_sform] }
 
 end sform
 end nterm
