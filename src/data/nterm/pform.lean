@@ -28,22 +28,40 @@ begin
   { unfold mul', unfold eval, rw eval_some}
 end
 
-protected def mul (x y : nterm γ) : nterm γ :=
-sorry
+private def mul_pform : option (nterm γ) → option (nterm γ) → option (nterm γ)
+| _ _ := sorry
 
-theorem eval_mul {x y : nterm γ} : eval ρ (pform.mul x y) = eval ρ x * eval ρ y :=
+private lemma eval_mul_pform {P Q : option (nterm γ)} : eval ρ (mul_pform P Q : nterm γ) = eval ρ (P : nterm γ) * eval ρ (Q : nterm γ) :=
 by sorry
 
+protected def mul (x y : nterm γ) : nterm γ :=
+mul (mul_pform (some x.term) (some y.term)) (const (x.coeff * y.coeff))
+
+theorem eval_mul {x y : nterm γ} : eval ρ (pform.mul x y) = eval ρ x * eval ρ y :=
+begin
+  unfold pform.mul, unfold eval,
+  rw [eval_mul_pform, eval_some, eval_some, morph.morph_mul],
+  rw [mul_assoc, mul_comm (↑(coeff x)), ← mul_assoc (eval ρ (term y))],
+  rw [← eval_term_coeff, mul_comm (eval ρ y), ← mul_assoc],
+  rw [← eval_term_coeff], refl
+end
+
 protected def pow (x : nterm γ) (n : znum) : nterm γ :=
-if n = 0 then const 1 else sorry
+if n = 0 then const 1 else pow x.mem (x.exp * n)
 
 --TODO: instace : has_pow α znum
 theorem eval_pow {x : nterm γ} {n : znum} : eval ρ (pform.pow x n) = eval ρ x ^ (n : ℤ) :=
 begin
   unfold pform.pow,
-  by_cases h : n = 0,
-  { rw [if_pos h, h, znum.cast_zero, fpow_zero], simp [eval] },
-  { rw [if_neg h], sorry }
+  by_cases h1 : n = 0,
+  { rw [if_pos h1, h1, znum.cast_zero, fpow_zero], simp [eval] },
+  { rw [if_neg h1], unfold eval,
+    by_cases h2 : eval ρ (mem x) = 0,
+    { rw [if_pos h2, eval_mem_zero.mpr h2, zero_fpow],
+      rw ← znum.cast_zero, intro h, apply h1,
+      apply znum.cast_inj.mp, apply h },
+    { rw [if_neg h2, eval_mem_exp x, znum.cast_mul, fpow_mul],
+      intro h, apply h2, rw ← eval_mem_zero, apply h}}
 end
 
 end pform

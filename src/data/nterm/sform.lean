@@ -184,8 +184,7 @@ private def add_sform : option (nterm γ) → option (nterm γ) → option (nter
 using_well_founded {
     rel_tac := λ _ _, `[exact ⟨psigma.lex r (λ _, r), psigma.lex_wf r_wf (λ _, r_wf)⟩],
     dec_tac := dec_tac
- }
-
+}
 
 private lemma add_sform_def1 {x : option (nterm γ)} :
   add_sform none x = x :=

@@ -257,8 +257,7 @@ begin
   repeat { refl }
 end
 
-theorem eval_term_coeff (x : nterm γ) :
-  eval ρ x = eval ρ x.term * x.coeff :=
+theorem eval_term_coeff (x : nterm γ) : eval ρ x = eval ρ x.term * x.coeff :=
 begin
   cases x,
   case mul : x y { 
@@ -289,6 +288,40 @@ end
 --    repeat { dsimp [function.comp, scale], refl }},
 --  repeat { dsimp [function.comp, scale], refl }
 --end
+
+def exp : nterm γ → znum
+| (pow _ n) := n
+| _ := 1
+
+def mem : nterm γ → nterm γ
+| (pow x _) := x
+| x := x
+
+theorem eval_mem_zero {x : nterm γ} : eval ρ x = 0 ↔ eval ρ (mem x) = 0 :=
+begin
+  apply iff.intro,
+  { intro h1, cases x,
+    case pow : x n {
+      unfold mem, unfold eval at h1,
+      by_contradiction h2,
+      rw [if_neg h2] at h1,
+      have h3 : eval ρ x ^ ↑n ≠ 0, from fpow_ne_zero_of_ne_zero h2 _,
+      apply_instance, contradiction },
+    repeat { simp [mem, eval, h1] }},
+  { intro h1, cases x,
+    case pow : x n { unfold eval, unfold mem at h1, rw if_pos h1 },
+    repeat { exact h1 }}
+end
+
+theorem eval_mem_exp (x : nterm γ) : eval ρ x ≠ 0 → eval ρ x = eval ρ (mem x) ^ (exp x : ℤ) :=
+begin
+  intro h1, have h2 : eval ρ (mem x) ≠ 0,
+  { intro h, rw ← eval_mem_zero at h, contradiction },
+  cases x, case pow : x n {
+    unfold mem at ⊢ h2, unfold exp,
+    unfold eval, rw if_neg h2 },
+  repeat { apply eq.symm, exact fpow_one _}
+end
 
 def nonzero (ρ : dict α) (ts : list (nterm γ)) : Prop :=
 ∀ t ∈ ts, nterm.eval ρ t ≠ 0
