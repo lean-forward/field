@@ -74,6 +74,8 @@ inductive r : option (nterm γ) → option (nterm γ) → Prop
 | none {S : nterm γ} : r none (some S)
 | rest {S : nterm γ} : r (rest S) (some S)
 
+namespace wf
+
 private lemma acc_r_none : @acc (option (nterm γ)) r none :=
 begin
   apply acc.intro, intros x h, cases h
@@ -122,6 +124,14 @@ begin
   cases h, { apply f_none }, { apply f_rest },
   apply measure_wf
 end
+
+meta def rel_tac : tactic unit := `[exact ⟨psigma.lex r (λ _, r), psigma.lex_wf wf.r_wf (λ _, wf.r_wf)⟩]
+
+meta def dec_tac : tactic unit :=
+`[apply psigma.lex.left, assumption, done]
+<|> `[apply psigma.lex.right, assumption, done]
+
+end wf
 
 private def aux (x y : nterm γ) (s1 s2 s3 : option (nterm γ)) : nterm γ :=
 if x.term = y.term then
@@ -175,10 +185,6 @@ begin
       { rw ← eval_term_coeff }}}
 end
 
-private meta def dec_tac : tactic unit :=
-`[apply psigma.lex.left, assumption, done]
-<|> `[apply psigma.lex.right, assumption, done]
-
 private def add_sform : option (nterm γ) → option (nterm γ) → option (nterm γ)
 | (some S) (some T) :=
   have h1 : r (rest S) (some S), from r.rest,
@@ -193,8 +199,8 @@ private def add_sform : option (nterm γ) → option (nterm γ) → option (nter
 | none x := x
 | x none := x
 using_well_founded {
-    rel_tac := λ _ _, `[exact ⟨psigma.lex r (λ _, r), psigma.lex_wf r_wf (λ _, r_wf)⟩],
-    dec_tac := dec_tac
+    rel_tac := λ _ _, wf.rel_tac,
+    dec_tac := wf.dec_tac,
 }
 
 private lemma add_sform_def1 {x : option (nterm γ)} :
@@ -239,8 +245,8 @@ theorem eval_add_sform : Π (S T : option (nterm γ)),
 | none x := by rw [add_sform_def1, eval_none, zero_add]
 | x none := by rw [add_sform_def2, eval_none, add_zero]
 using_well_founded {
-    rel_tac := λ _ _, `[exact ⟨psigma.lex r (λ _, r), psigma.lex_wf r_wf (λ _, r_wf)⟩],
-    dec_tac := dec_tac
+    rel_tac := λ _ _, wf.rel_tac,
+    dec_tac := wf.dec_tac,
 }
 
 protected def add (x y : nterm γ) : nterm γ :=
