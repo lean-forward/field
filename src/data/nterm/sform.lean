@@ -16,14 +16,14 @@ by apply morph.morph0
 private lemma eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ x := rfl
 
 def to_sform : nterm γ → option (nterm γ) | x :=
-if x = const 0 then none else x --TODO
+if x = const 0 then none else some x --TODO
 
 private lemma eval_to_sform {x : nterm γ} : eval ρ (to_sform x : nterm γ) = eval ρ x :=
 begin
   unfold to_sform,
   by_cases h1 : x = const 0,
   { rw [if_pos h1, h1, eval_none], simp [eval] },
-  { rw [if_neg h1], refl }
+  { rw [if_neg h1, eval_some] }
 end
 
 private def add' : option (nterm γ) → nterm γ → nterm γ

@@ -15,6 +15,17 @@ by apply morph.morph1
 
 private lemma eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ x := rfl
 
+private def to_pform : nterm γ → option (nterm γ) | x :=
+if x = const 1 then none else some x --TODO
+
+private lemma eval_to_pform {x : nterm γ} : eval ρ (to_pform x : nterm γ) = eval ρ x :=
+begin
+  unfold to_pform,
+  by_cases h1 : x = const 1,
+  { rw [if_pos h1, h1, eval_none], simp [eval] },
+  { rw [if_neg h1, eval_some] }
+end
+
 private def mul' : option (nterm γ) → nterm γ → nterm γ
 | (some x) y := mul x y
 | none y := y
@@ -35,12 +46,12 @@ private lemma eval_mul_pform {P Q : option (nterm γ)} : eval ρ (mul_pform P Q 
 by sorry
 
 protected def mul (x y : nterm γ) : nterm γ :=
-mul (mul_pform (some x.term) (some y.term)) (const (x.coeff * y.coeff))
+mul (mul_pform (to_pform x.term) (to_pform y.term)) (const (x.coeff * y.coeff))
 
 theorem eval_mul {x y : nterm γ} : eval ρ (pform.mul x y) = eval ρ x * eval ρ y :=
 begin
   unfold pform.mul, unfold eval,
-  rw [eval_mul_pform, eval_some, eval_some, morph.morph_mul],
+  rw [eval_mul_pform, eval_to_pform, eval_to_pform, morph.morph_mul],
   rw [mul_assoc, mul_comm (↑(coeff x)), ← mul_assoc (eval ρ (term y))],
   rw [← eval_term_coeff, mul_comm (eval ρ y), ← mul_assoc],
   rw [← eval_term_coeff], refl
