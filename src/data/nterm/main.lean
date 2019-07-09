@@ -17,15 +17,10 @@ instance : has_pow (nterm γ) znum := ⟨λ x n, if n = 0 then 1 else sorry⟩
 instance pow_nat : has_pow (nterm γ) ℕ := ⟨λ (x : nterm γ) (n : ℕ), x ^ (n : znum)⟩ --test
 instance pow_int : has_pow (nterm γ) ℤ := ⟨λ (x : nterm γ) (n : ℤ), x ^ (n : znum)⟩ --test
 
-def neg (x : nterm γ) : nterm γ := x.scale (-1)
-def sub (x y : nterm γ) : nterm γ := x + neg y
-def inv (x : nterm γ) : nterm γ := x ^ (-1 : znum)
-def div (x y : nterm γ) : nterm γ := x * (inv y)
-
-instance : has_neg (nterm γ) := ⟨neg⟩
-instance : has_sub (nterm γ) := ⟨sub⟩
-instance : has_inv (nterm γ) := ⟨inv⟩
-instance : has_div (nterm γ) := ⟨div⟩
+instance : has_neg (nterm γ) := ⟨scale (-1)⟩
+instance : has_sub (nterm γ) := ⟨λ x y, x + -y⟩
+instance : has_inv (nterm γ) := ⟨λ x, x ^ (-1 : znum)⟩
+instance : has_div (nterm γ) := ⟨λ x y, x * y⁻¹⟩
 
 section
 variables {x y : nterm γ} {i : num} {n : znum} {c : γ}
