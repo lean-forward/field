@@ -22,9 +22,7 @@ namespace option
 
 theorem map_map {α β γ} {f : α → β} {g : β → γ} {x : option α} :
   option.map g (option.map f x) = option.map (g ∘ f) x :=
-begin
-  sorry
-end
+by cases x; refl
 
 end option
 
