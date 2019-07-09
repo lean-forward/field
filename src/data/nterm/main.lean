@@ -11,18 +11,21 @@ instance coe_atom : has_coe num (nterm γ) := ⟨atom⟩
 instance coe_const: has_coe γ (nterm γ) := ⟨const⟩
 instance : has_zero (nterm γ) := ⟨const 0⟩
 instance : has_one (nterm γ) := ⟨const 1⟩
+
 instance : has_add (nterm γ) := ⟨sform.add⟩
 instance : has_mul (nterm γ) := ⟨pform.mul⟩
 instance : has_pow (nterm γ) znum := ⟨λ x n, if n = 0 then 1 else sorry⟩
-instance pow_nat : has_pow (nterm γ) ℕ := ⟨λ (x : nterm γ) (n : ℕ), x ^ (n : znum)⟩ --test
-instance pow_int : has_pow (nterm γ) ℤ := ⟨λ (x : nterm γ) (n : ℤ), x ^ (n : znum)⟩ --test
 
 instance : has_neg (nterm γ) := ⟨scale (-1)⟩
 instance : has_sub (nterm γ) := ⟨λ x y, x + -y⟩
 instance : has_inv (nterm γ) := ⟨λ x, x ^ (-1 : znum)⟩
 instance : has_div (nterm γ) := ⟨λ x y, x * y⁻¹⟩
 
+instance pow_nat : has_pow (nterm γ) ℕ := ⟨λ (x : nterm γ) (n : ℕ), x ^ (n : znum)⟩ --test
+instance pow_int : has_pow (nterm γ) ℤ := ⟨λ (x : nterm γ) (n : ℤ), x ^ (n : znum)⟩ --test
+
 section
+
 variables {x y : nterm γ} {i : num} {n : znum} {c : γ}
 
 @[simp] theorem eval_zero  : eval ρ (0 : nterm γ) = 0       := by apply morph.morph0
