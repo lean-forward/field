@@ -1,6 +1,5 @@
 import .basic
 
-namespace field
 namespace nterm
 
 @[reducible] def pform (γ) [const_space γ] := option (nterm γ)
@@ -42,6 +41,37 @@ begin
   { unfold mul', unfold eval, rw eval_some}
 end
 
+private def left : nterm γ → pform γ
+| (mul x _) := some x
+| _ := none
+
+private def right : nterm γ → (nterm γ)
+| (mul _ x) := x
+| x := x
+
+def rest (P : nterm γ) : pform γ := (left P.mem).map (pow_mul P.exp)
+
+def lead (P : nterm γ) : nterm γ := pow_mul P.exp (right P.mem)
+
+theorem eval_left_right (x : nterm γ) :
+  eval ρ x = eval ρ (left x : nterm γ) * eval ρ (right x) :=
+begin
+  cases x,
+  case mul : x y { unfold left, unfold right, unfold eval, rw eval_some },
+  repeat { unfold left, unfold right, unfold eval, rw [eval_none, one_mul] }
+end
+
+theorem eval_rest_lead {P : nterm γ} :
+  eval ρ P = eval ρ (rest P : nterm γ) * eval ρ (lead P) :=
+begin
+  rw [eval_mem_exp, eval_left_right, mul_fpow],
+  congr' 1,
+  { unfold rest, cases (mem P),
+    case mul : { dsimp [left, option.map], rw [eval_some, eval_some, eval_pow_mul] },
+    repeat { dsimp [left, option.map], rw [eval_none, one_fpow] }},
+  { unfold lead, rw eval_pow_mul }
+end
+
 private def mul_pform : pform γ → pform γ → pform γ
 | x y := mul' x y --TODO
 
@@ -49,39 +79,22 @@ private lemma eval_mul_pform {P Q : pform γ} : eval ρ (mul_pform P Q : nterm �
 by apply eval_mul'
 
 protected def mul (x y : nterm γ) : nterm γ :=
-mul (mul_pform (to_pform x.term) (to_pform y.term)) (const (x.coeff * y.coeff))
+if x = const 0 ∨ y = const 0 then
+  const 0
+else
+  mul (mul_pform (to_pform x.term) (to_pform y.term)) (const (x.coeff * y.coeff))
 
 theorem eval_mul {x y : nterm γ} : eval ρ (pform.mul x y) = eval ρ x * eval ρ y :=
 begin
-  unfold pform.mul, unfold eval,
-  rw [eval_mul_pform, eval_to_pform, eval_to_pform, morph.morph_mul],
-  rw [mul_assoc, mul_comm (↑(coeff x)), ← mul_assoc (eval ρ (term y))],
-  rw [← eval_term_coeff, mul_comm (eval ρ y), ← mul_assoc],
-  rw [← eval_term_coeff], refl
+  unfold pform.mul,
+  by_cases h1 : x = const 0 ∨ y = const 0,
+  { rw if_pos h1, cases h1; rw h1; simp [eval] },
+  { rw if_neg h1, unfold eval,
+    rw [eval_mul_pform, eval_to_pform, eval_to_pform, morph.morph_mul],
+    rw [mul_assoc, mul_comm (↑(coeff x)), ← mul_assoc (eval ρ (term y))],
+    rw [← eval_term_coeff, mul_comm (eval ρ y), ← mul_assoc],
+    rw [← eval_term_coeff] }
 end
-
-protected def pow (x : nterm γ) (n : znum) : nterm γ :=
-if n = 0 then
-  const 1
-else if x.exp * n = 1 then
-  x.mem
-else
-  pow x.mem (x.exp * n)
-
-theorem eval_pow {x : nterm γ} {n : znum} : eval ρ (pform.pow x n) = eval ρ x ^ (n : ℤ) :=
-begin
-  unfold pform.pow,
-  by_cases h1 : n = 0,
-  { rw [if_pos h1, h1, znum.cast_zero, fpow_zero], simp [eval] },
-  { by_cases h2 : x.exp * n = 1,
-    { rw [if_neg h1, if_pos h2, eval_mem_exp x],
-      rw [← fpow_mul, ← znum.cast_mul, h2],
-      rw [znum.cast_one, fpow_one] },
-    { rw [if_neg h1, if_neg h2], unfold eval,
-      rw [znum.cast_mul, fpow_mul, ← eval_mem_exp]}}
-end
-#check znum.gcd
 
 end pform
 end nterm
-end field

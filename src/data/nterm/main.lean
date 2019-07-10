@@ -1,6 +1,5 @@
 import .sform .pform
 
-namespace field
 namespace nterm
 
 variables {α : Type} [discrete_field α]
@@ -9,12 +8,13 @@ variables [morph γ α] {ρ : dict α}
 
 instance coe_atom  : has_coe num (nterm γ) := ⟨atom⟩
 instance coe_const : has_coe γ (nterm γ) := ⟨const⟩
+
 instance : has_zero (nterm γ) := ⟨const 0⟩
 instance : has_one (nterm γ) := ⟨const 1⟩
 
 instance : has_add (nterm γ) := ⟨sform.add⟩
 instance : has_mul (nterm γ) := ⟨pform.mul⟩
-instance : has_pow (nterm γ) ℤ := ⟨λ (x : nterm γ) (n : ℤ), pform.pow x (n : znum)⟩
+instance : has_pow (nterm γ) ℤ := ⟨λ (x : nterm γ) (n : ℤ), pow_mul (n : znum) x⟩
 
 instance : has_neg (nterm γ) := ⟨scale (-1)⟩
 instance : has_sub (nterm γ) := ⟨λ x y, x + -y⟩
@@ -34,7 +34,7 @@ variables {x y : nterm γ} {i : num} {n : ℤ} {c : γ}
 
 @[simp] theorem eval_add : eval ρ (x + y) = eval ρ x + eval ρ y := sform.eval_add
 @[simp] theorem eval_mul : eval ρ (x * y) = eval ρ x * eval ρ y := pform.eval_mul
-@[simp] theorem eval_pow : eval ρ (x ^ n) = eval ρ x ^ n        := by { convert pform.eval_pow, rw znum.to_of_int }
+@[simp] theorem eval_pow : eval ρ (x ^ n) = eval ρ x ^ n        := by { convert eval_pow_mul, rw znum.to_of_int }
 
 @[simp] theorem eval_neg : eval ρ (-x)    = - x.eval ρ          := by { refine eq.trans eval_scale _, rw [morph.morph_neg, morph.morph1, mul_neg_one] }
 @[simp] theorem eval_sub : eval ρ (x - y) = x.eval ρ - y.eval ρ := by { refine eq.trans eval_add _, rw [eval_neg, sub_eq_add_neg] }
@@ -46,4 +46,3 @@ variables {x y : nterm γ} {i : num} {n : ℤ} {c : γ}
 end
 
 end nterm
-end field

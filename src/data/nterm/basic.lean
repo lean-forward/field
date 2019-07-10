@@ -65,8 +65,6 @@ end
 
 end list
 
-namespace field
-
 structure dict (α : Type) :=
 (val : num → α)
 
@@ -98,11 +96,6 @@ instance rat_morph {α} [discrete_field α] [char_zero α] : morph ℚ α :=
     end,
 }
 
-attribute [simp] morph.morph0
-attribute [simp] morph.morph1
-attribute [simp] morph.morph_mul
---TODO
-
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [discrete_field γ]
 variables [morph γ α]
@@ -110,8 +103,9 @@ variables {a b : γ}
 
 instance has_coe : has_coe γ α := morph.cast γ α
 
-@[squash_cast] theorem morph0' : ((0 : γ) : α) = 0 := by apply morph.morph0
-@[squash_cast] theorem morph1' : ((1 : γ) : α) = 1 := by apply morph.morph1
+@[simp, squash_cast] theorem morph0' : ((0 : γ) : α) = 0 := by apply morph.morph0
+@[simp, squash_cast] theorem morph1' : ((1 : γ) : α) = 1 := by apply morph.morph1
+--TODO: more simp lemmas?
 
 @[move_cast] theorem morph_add' : ∀ a b : γ, ((a + b : γ) : α) = a + b := by apply morph_add
 @[move_cast] theorem morph_neg' : ∀ a : γ, ((-a : γ) : α) = -a := by apply morph_neg
@@ -228,12 +222,14 @@ meta def to_str [has_to_string γ] : (nterm γ) → string
 meta instance [has_to_string γ] : has_to_string (nterm γ) := ⟨to_str⟩
 meta instance [has_to_string γ] : has_to_tactic_format (nterm γ) := ⟨λ x, return (to_str x : format)⟩
 
-
 def scale (a : γ) (x : nterm γ) : nterm γ :=
-match x with
-| (mul x (const b)) := mul x (const (a * b))
-| x := mul x (const a) --should not happen
-end
+if a = 0 then
+  const 0
+else
+  match x with
+  | (mul x (const b)) := mul x (const (a * b))
+  | x := mul x (const a) --should not happen
+  end
 
 def coeff : nterm γ → γ
 | (mul x (const a)) := a
@@ -246,15 +242,16 @@ def term : nterm γ → nterm γ
 theorem eval_scale {a : γ} {x : nterm γ} :
   eval ρ (x.scale a) = eval ρ x * a :=
 begin
-  unfold scale, cases x,
-  case mul : x y { 
-    cases y,
-    case const : b {
-      unfold scale, unfold eval,
-      rw [mul_assoc, mul_comm a, morph.morph_mul],
-      refl },
-    repeat { refl }},
-  repeat { refl }
+  unfold scale,
+  by_cases h1 : a = 0,
+  { rw [if_pos h1, h1], simp [eval] },
+  { rw [if_neg h1],
+    cases x, case mul : x y { 
+      cases y, case const : b {
+        unfold scale, unfold eval,
+        rw [mul_assoc, mul_comm a, morph.morph_mul] },
+      repeat { refl }},
+    repeat { refl }}
 end
 
 theorem eval_term_coeff (x : nterm γ) : eval ρ x = eval ρ x.term * x.coeff :=
@@ -304,6 +301,27 @@ begin
   repeat { dsimp [mem, exp, eval], rw fpow_one }
 end
 
+def pow_mul (n : znum) (x : nterm γ) : nterm γ :=
+if n = 0 then
+  const 1
+else if x.exp * n = 1 then
+  x.mem
+else
+  pow x.mem (x.exp * n)
+
+theorem eval_pow_mul {n : znum} {x : nterm γ} : eval ρ (pow_mul n x) = eval ρ x ^ (n : ℤ) :=
+begin
+  unfold pow_mul,
+  by_cases h1 : n = 0,
+  { rw [if_pos h1, h1, znum.cast_zero, fpow_zero], simp [eval] },
+  { by_cases h2 : x.exp * n = 1,
+    { rw [if_neg h1, if_pos h2, eval_mem_exp x],
+      rw [← fpow_mul, ← znum.cast_mul, h2],
+      rw [znum.cast_one, fpow_one] },
+    { rw [if_neg h1, if_neg h2], unfold eval,
+      rw [znum.cast_mul, fpow_mul, ← eval_mem_exp]}}
+end
+
 def nonzero (ρ : dict α) (ts : list (nterm γ)) : Prop :=
 ∀ t ∈ ts, nterm.eval ρ t ≠ 0
 
@@ -332,5 +350,3 @@ begin
 end
 
 end nterm
-
-end field

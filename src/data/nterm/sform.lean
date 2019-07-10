@@ -1,6 +1,5 @@
 import .basic
 
-namespace field
 namespace nterm
 
 @[reducible] def sform (γ) [const_space γ] := option (nterm γ)
@@ -93,30 +92,37 @@ private def f : sform γ → ℕ
 | (some x) := 1 + g x
 | none := 0
 
-theorem g_scale {x : nterm γ} {a : γ} : g (x.scale a) = g x :=
+theorem g_scale {x : nterm γ} {a : γ} : g (x.scale a) ≤ g x :=
 begin
-  cases x, case mul : x y {
-    cases y, case const : b { refl },
-    repeat { refl }},
-  repeat { refl }
+  by_cases h1 : a = 0,
+  { simp [scale, h1, g] },
+  { cases x,
+    case mul : x y { cases y, repeat {simp [scale, h1, g] } },
+    repeat { simp [scale, h1, g] }}
 end
 
 private lemma f_none {S : nterm γ} : f (none : sform γ) < f (some S) :=
 by { unfold f, linarith }
 
-private lemma f_option_map {x : sform γ} {a : γ} : f (option.map (scale a) x) = f x :=
-by { cases x, {refl}, {simp [f, g_scale]} }
+private lemma f_map_scale {x : sform γ} {a : γ} : f (option.map (scale a) x) ≤ f x :=
+by { cases x; simp [f, g_scale] }
 
 private lemma f_rest {S : nterm γ} : f (rest S) < f (some S) :=
 begin
+  --TODO: simplify proof
   show f (rest S) < 1 + g S,
-  unfold rest,
   cases S,
-  case add : { simp [term, left, coeff, f, g, g_scale], linarith },
-  case mul : x y { rw f_option_map, cases y,
-    case const : { cases x, repeat { simp [term, left, f, g], linarith }},
-    repeat { simp [term, left, f], linarith }},
-  repeat { simp [term, left, f], linarith }
+  case add : {
+      simp only [rest, term, left, coeff, f, g, option.map_some', add_lt_add_iff_left],
+      apply lt_of_le_of_lt, { apply g_scale }, { linarith }},
+  case mul : x y {
+      cases y, case const : {
+        simp only [rest, term, left, coeff, g],
+        apply lt_of_le_of_lt,
+        { apply f_map_scale },
+        { cases x, repeat { simp [left, f, g], linarith }}},
+      repeat { simp [rest, term, left, coeff, f], linarith }},
+  repeat { simp [rest, term, left, f], linarith }
 end
 
 theorem r_wf : @well_founded (sform γ) r :=
@@ -260,4 +266,3 @@ by { unfold sform.add, rw [eval_add_sform, eval_to_sform, eval_to_sform] }
 
 end sform
 end nterm
-end field
