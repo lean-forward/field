@@ -2,20 +2,24 @@ import .basic
 
 namespace field
 namespace nterm
+
+@[reducible] def sform (γ) [const_space γ] := option (nterm γ)
+
 namespace sform
 
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
-instance : has_coe (option (nterm γ)) (nterm γ) := ⟨λ x, x.get_or_else (const 0)⟩
+--instance : has_zero (sform γ) := ⟨none⟩
+instance : has_coe (sform γ) (nterm γ) := ⟨λ x, x.get_or_else (const 0)⟩
 
-private lemma eval_none : eval ρ ((none : option (nterm γ)) : nterm γ) = 0 :=
+private lemma eval_none : eval ρ ((none : sform γ) : nterm γ) = 0 :=
 by apply morph.morph0
 
 private lemma eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ x := rfl
 
-def to_sform : nterm γ → option (nterm γ) | x :=
+def to_sform : nterm γ → sform γ | x :=
 if x = const 0 then none else some x --TODO
 
 private lemma eval_to_sform {x : nterm γ} : eval ρ (to_sform x : nterm γ) = eval ρ x :=
@@ -26,20 +30,19 @@ begin
   { rw [if_neg h1, eval_some] }
 end
 
-private def add' : option (nterm γ) → nterm γ → nterm γ
+private def add' : sform γ → nterm γ → nterm γ
 | (some x) y := add x y
 | none y := y
 
-private lemma eval_add' {x : option (nterm γ)} {y : nterm γ} :
-  eval ρ (add' x y) = eval ρ (add (x : nterm γ) y) :=
+private lemma eval_add' {x : sform γ} {y : nterm γ} :
+  eval ρ (add' x y) = eval ρ (x : nterm γ) + eval ρ y :=
 begin
   cases x,
-  { unfold add', unfold eval,
-    rw eval_none, simp },
+  { unfold add', rw [eval_none, zero_add] },
   { unfold add', unfold eval, rw eval_some}
 end
 
-private def left : nterm γ → option (nterm γ)
+private def left : nterm γ → sform γ
 | (add x _) := some x
 | _ := none
 
@@ -47,7 +50,7 @@ private def right : nterm γ → (nterm γ)
 | (add _ x) := x
 | x := x
 
-def rest (S : nterm γ) : option (nterm γ) := (left S.term).map (scale S.coeff)
+def rest (S : nterm γ) : sform γ := (left S.term).map (scale S.coeff)
 
 def lead (S : nterm γ) : nterm γ := scale S.coeff (right S.term)
 
@@ -70,13 +73,13 @@ begin
   { unfold lead, rw eval_scale }
 end
 
-inductive r : option (nterm γ) → option (nterm γ) → Prop
+inductive r : sform γ → sform γ → Prop
 | none {S : nterm γ} : r none (some S)
 | rest {S : nterm γ} : r (rest S) (some S)
 
 namespace wf
 
-private lemma acc_r_none : @acc (option (nterm γ)) r none :=
+private lemma acc_r_none : @acc (sform γ) r none :=
 begin
   apply acc.intro, intros x h, cases h
 end
@@ -86,7 +89,7 @@ private def g : nterm γ → ℕ
 | (mul x (const _)) := g x
 | _ := 0
 
-private def f : option (nterm γ) → ℕ
+private def f : sform γ → ℕ
 | (some x) := 1 + g x
 | none := 0
 
@@ -98,10 +101,10 @@ begin
   repeat { refl }
 end
 
-private lemma f_none {S : nterm γ} : f (none : option (nterm γ)) < f (some S) :=
+private lemma f_none {S : nterm γ} : f (none : sform γ) < f (some S) :=
 by { unfold f, linarith }
 
-private lemma f_option_map {x : option (nterm γ)} {a : γ} : f (option.map (scale a) x) = f x :=
+private lemma f_option_map {x : sform γ} {a : γ} : f (option.map (scale a) x) = f x :=
 by { cases x, {refl}, {simp [f, g_scale]} }
 
 private lemma f_rest {S : nterm γ} : f (rest S) < f (some S) :=
@@ -116,7 +119,7 @@ begin
   repeat { simp [term, left, f], linarith }
 end
 
-theorem r_wf : @well_founded (option (nterm γ)) r :=
+theorem r_wf : @well_founded (sform γ) r :=
 begin
   apply subrelation.wf,
   intros x y h,
@@ -133,7 +136,7 @@ meta def dec_tac : tactic unit :=
 
 end wf
 
-private def aux (x y : nterm γ) (s1 s2 s3 : option (nterm γ)) : nterm γ :=
+private def aux (x y : nterm γ) (s1 s2 s3 : sform γ) : nterm γ :=
 if x.term = y.term then
   if x.coeff + y.coeff = 0 then s1
   else (add' (s1.map (scale (x.coeff + y.coeff)⁻¹)) x.term).scale (x.coeff + y.coeff)
@@ -142,7 +145,7 @@ else if lt x.term y.term then
 else
   (add' (s3.map (scale y.coeff⁻¹)) y.term).scale y.coeff
 
-private lemma eval_aux {x y : nterm γ} {s1 s2 s3 : option (nterm γ)}
+private lemma eval_aux {x y : nterm γ} {s1 s2 s3 : sform γ}
   ( H0 : x.coeff ≠ 0 ∧ y.coeff ≠ 0)
   ( H1 : eval ρ (s2 : nterm γ) = eval ρ (s1 : nterm γ) + eval ρ y )
   ( H2 : eval ρ (s3 : nterm γ) = eval ρ (s1 : nterm γ) + eval ρ x ) :
@@ -157,7 +160,7 @@ begin
       rw [eval_term_coeff y, ← mul_add, ← morph.morph_add],
       rw [h2, morph.morph0, mul_zero, add_zero] },
     { rw [if_pos h1, if_neg h2, eval_scale, eval_add'],
-      unfold eval, rw add_mul, congr' 1,
+      rw add_mul, congr' 1,
       { cases s1,
         { dsimp [option.map], rw [eval_none, zero_mul] },
         { dsimp [option.map], rw [eval_some, eval_some, eval_scale],
@@ -167,7 +170,7 @@ begin
         rw [← eval_term_coeff, h1, ← eval_term_coeff] }}},
   { by_cases h2 : x.term < y.term,
     { rw [if_neg h1, if_pos h2, eval_scale, eval_add'],
-      unfold eval, rw add_mul, congr' 1,
+      rw add_mul, congr' 1,
       { convert H1, cases s2,
         { dsimp [option.map], rw [eval_none, zero_mul] },
         { dsimp [option.map], rw [eval_some, eval_some, eval_scale],
@@ -176,7 +179,7 @@ begin
       { rw ← eval_term_coeff }},
     { rw [if_neg h1, if_neg h2, eval_scale, eval_add'],
       rw [add_assoc, add_comm (eval ρ y), ← add_assoc],
-      unfold eval, rw add_mul, congr' 1,
+      rw add_mul, congr' 1,
       { convert H2, cases s3,
         { dsimp [option.map], rw [eval_none, zero_mul] },
         { dsimp [option.map], rw [eval_some, eval_some, eval_scale],
@@ -185,7 +188,7 @@ begin
       { rw ← eval_term_coeff }}}
 end
 
-private def add_sform : option (nterm γ) → option (nterm γ) → option (nterm γ)
+private def add_sform : sform γ → sform γ → sform γ
 | (some S) (some T) :=
   have h1 : r (rest S) (some S), from r.rest,
   have h2 : r (rest T) (some T), from r.rest,
@@ -203,11 +206,11 @@ using_well_founded {
     dec_tac := wf.dec_tac,
 }
 
-private lemma add_sform_def1 {x : option (nterm γ)} :
+private lemma add_sform_def1 {x : sform γ} :
   add_sform none x = x :=
 by cases x; unfold add_sform
 
-private lemma add_sform_def2 {x : option (nterm γ)} :
+private lemma add_sform_def2 {x : sform γ} :
   add_sform x none = x :=
 by cases x; unfold add_sform
 
@@ -223,7 +226,7 @@ begin
   simp [h0, add_sform]
 end
 
-theorem eval_add_sform : Π (S T : option (nterm γ)),
+theorem eval_add_sform : Π (S T : sform γ),
   eval ρ (add_sform S T : nterm γ) = eval ρ (S : nterm γ) + eval ρ (T : nterm γ)
 | (some S) (some T) :=
   have h1 : r (rest S) (some S), from r.rest,

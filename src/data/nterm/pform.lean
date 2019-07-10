@@ -2,20 +2,24 @@ import .basic
 
 namespace field
 namespace nterm
+
+@[reducible] def pform (γ) [const_space γ] := option (nterm γ)
+
 namespace pform
 
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
-instance : has_coe (option (nterm γ)) (nterm γ) := ⟨λ x, x.get_or_else (const 1)⟩
+--instance : has_one (pform γ) := ⟨none⟩
+instance : has_coe (pform γ) (nterm γ) := ⟨λ x, x.get_or_else (const 1)⟩
 
-private lemma eval_none : eval ρ ((none : option (nterm γ)) : nterm γ) = 1 :=
+private lemma eval_none : eval ρ ((none : pform γ) : nterm γ) = 1 :=
 by apply morph.morph1
 
 private lemma eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ x := rfl
 
-private def to_pform : nterm γ → option (nterm γ) | x :=
+private def to_pform : nterm γ → pform γ | x :=
 if x = const 1 then none else some x --TODO
 
 private lemma eval_to_pform {x : nterm γ} : eval ρ (to_pform x : nterm γ) = eval ρ x :=
@@ -26,24 +30,23 @@ begin
   { rw [if_neg h1, eval_some] }
 end
 
-private def mul' : option (nterm γ) → nterm γ → nterm γ
+private def mul' : pform γ → nterm γ → nterm γ
 | (some x) y := mul x y
 | none y := y
 
-private lemma eval_mul' {x : option (nterm γ)} {y : nterm γ} :
-  eval ρ (mul' x y) = eval ρ (mul (x : nterm γ) y) :=
+private lemma eval_mul' {x : pform γ} {y : nterm γ} :
+  eval ρ (mul' x y) = eval ρ (x : nterm γ) * eval ρ y :=
 begin
   cases x,
-  { unfold mul', unfold eval,
-    rw eval_none, simp },
+  { unfold mul', rw [eval_none, one_mul]  },
   { unfold mul', unfold eval, rw eval_some}
 end
 
-private def mul_pform : option (nterm γ) → option (nterm γ) → option (nterm γ)
-| _ _ := sorry
+private def mul_pform : pform γ → pform γ → pform γ
+| x y := mul' x y --TODO
 
-private lemma eval_mul_pform {P Q : option (nterm γ)} : eval ρ (mul_pform P Q : nterm γ) = eval ρ (P : nterm γ) * eval ρ (Q : nterm γ) :=
-by sorry
+private lemma eval_mul_pform {P Q : pform γ} : eval ρ (mul_pform P Q : nterm γ) = eval ρ (P : nterm γ) * eval ρ (Q : nterm γ) :=
+by apply eval_mul'
 
 protected def mul (x y : nterm γ) : nterm γ :=
 mul (mul_pform (to_pform x.term) (to_pform y.term)) (const (x.coeff * y.coeff))

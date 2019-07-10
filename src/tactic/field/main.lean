@@ -119,13 +119,14 @@ def norm (x : eterm γ) : nterm γ :=
 x.to_nterm
 
 def norm_hyps (x : eterm γ) : list (nterm γ) :=
-sorry
+[]
 
 theorem correctness {x : eterm γ} {ρ : dict α} :
   (∀ t ∈ norm_hyps x, nterm.eval ρ t ≠ 0) →
   eterm.eval ρ x = nterm.eval ρ (norm x) :=
 begin
-  sorry
+  intro h, apply eq.symm,
+  apply eterm.correctness
 end
 
 end norm
