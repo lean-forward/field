@@ -216,7 +216,7 @@ def eval (ρ : dict α) : nterm γ → α
 | (const c) := ↑c
 | (add x y) := eval x + eval y
 | (mul x y) := eval x * eval y
-| (pow x n) := if eval x = 0 then 0 else eval x ^ (n : ℤ)
+| (pow x n) := eval x ^ (n : ℤ)
 
 meta def to_str [has_to_string γ] : (nterm γ) → string
 | (atom i)  := "#" ++ to_string (i : ℕ)
@@ -297,30 +297,11 @@ def mem : nterm γ → nterm γ
 | (pow x _) := x
 | x := x
 
-theorem eval_mem_zero {x : nterm γ} : eval ρ x = 0 ↔ eval ρ (mem x) = 0 :=
+theorem eval_mem_exp (x : nterm γ) : eval ρ x = eval ρ (mem x) ^ (exp x : ℤ) :=
 begin
-  apply iff.intro,
-  { intro h1, cases x,
-    case pow : x n {
-      unfold mem, unfold eval at h1,
-      by_contradiction h2,
-      rw [if_neg h2] at h1,
-      have h3 : eval ρ x ^ ↑n ≠ 0, from fpow_ne_zero_of_ne_zero h2 _,
-      apply_instance, contradiction },
-    repeat { simp [mem, eval, h1] }},
-  { intro h1, cases x,
-    case pow : x n { unfold eval, unfold mem at h1, rw if_pos h1 },
-    repeat { exact h1 }}
-end
-
-theorem eval_mem_exp (x : nterm γ) : eval ρ x ≠ 0 → eval ρ x = eval ρ (mem x) ^ (exp x : ℤ) :=
-begin
-  intro h1, have h2 : eval ρ (mem x) ≠ 0,
-  { intro h, rw ← eval_mem_zero at h, contradiction },
-  cases x, case pow : x n {
-    unfold mem at ⊢ h2, unfold exp,
-    unfold eval, rw if_neg h2 },
-  repeat { apply eq.symm, exact fpow_one _}
+  cases x,
+  case pow : x n { dsimp [mem, exp, eval], refl },
+  repeat { dsimp [mem, exp, eval], rw fpow_one }
 end
 
 def nonzero (ρ : dict α) (ts : list (nterm γ)) : Prop :=

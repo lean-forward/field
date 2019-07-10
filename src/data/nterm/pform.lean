@@ -61,22 +61,26 @@ begin
 end
 
 protected def pow (x : nterm γ) (n : znum) : nterm γ :=
-if n = 0 then const 1 else pow x.mem (x.exp * n)
+if n = 0 then
+  const 1
+else if x.exp * n = 1 then
+  x.mem
+else
+  pow x.mem (x.exp * n)
 
---TODO: instace : has_pow α znum
 theorem eval_pow {x : nterm γ} {n : znum} : eval ρ (pform.pow x n) = eval ρ x ^ (n : ℤ) :=
 begin
   unfold pform.pow,
   by_cases h1 : n = 0,
   { rw [if_pos h1, h1, znum.cast_zero, fpow_zero], simp [eval] },
-  { rw [if_neg h1], unfold eval,
-    by_cases h2 : eval ρ (mem x) = 0,
-    { rw [if_pos h2, eval_mem_zero.mpr h2, zero_fpow],
-      rw ← znum.cast_zero, intro h, apply h1,
-      apply znum.cast_inj.mp, apply h },
-    { rw [if_neg h2, eval_mem_exp x, znum.cast_mul, fpow_mul],
-      intro h, apply h2, rw ← eval_mem_zero, apply h}}
+  { by_cases h2 : x.exp * n = 1,
+    { rw [if_neg h1, if_pos h2, eval_mem_exp x],
+      rw [← fpow_mul, ← znum.cast_mul, h2],
+      rw [znum.cast_one, fpow_one] },
+    { rw [if_neg h1, if_neg h2], unfold eval,
+      rw [znum.cast_mul, fpow_mul, ← eval_mem_exp]}}
 end
+#check znum.gcd
 
 end pform
 end nterm
