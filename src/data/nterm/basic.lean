@@ -105,14 +105,13 @@ instance has_coe : has_coe γ α := morph.cast γ α
 
 @[simp, squash_cast] theorem morph0' : ((0 : γ) : α) = 0 := by apply morph.morph0
 @[simp, squash_cast] theorem morph1' : ((1 : γ) : α) = 1 := by apply morph.morph1
---TODO: more simp lemmas?
 
-@[move_cast] theorem morph_add' : ∀ a b : γ, ((a + b : γ) : α) = a + b := by apply morph_add
-@[move_cast] theorem morph_neg' : ∀ a : γ, ((-a : γ) : α) = -a := by apply morph_neg
-@[move_cast] theorem morph_mul' : ∀ a b : γ, ((a * b : γ) : α) = a * b := by apply morph_mul
-@[move_cast] theorem morph_inv' : ∀ a : γ, ((a⁻¹ : γ) : α) = a⁻¹ := by apply morph_inv
+@[simp, move_cast] theorem morph_add' : ∀ a b : γ, ((a + b : γ) : α) = a + b := by apply morph_add
+@[simp, move_cast] theorem morph_neg' : ∀ a : γ, ((-a : γ) : α) = -a := by apply morph_neg
+@[simp, move_cast] theorem morph_mul' : ∀ a b : γ, ((a * b : γ) : α) = a * b := by apply morph_mul
+@[simp, move_cast] theorem morph_inv' : ∀ a : γ, ((a⁻¹ : γ) : α) = a⁻¹ := by apply morph_inv
 
-@[move_cast] theorem morph_sub : ((a - b : γ) : α) = a - b :=
+@[simp, move_cast] theorem morph_sub : ((a - b : γ) : α) = a - b :=
 by rw [sub_eq_add_neg, morph.morph_add, morph.morph_neg, ← sub_eq_add_neg]
 
 @[elim_cast] theorem morph_inj' : ∀ a b : γ, (a : α) = b ↔ a = b :=
@@ -127,10 +126,10 @@ begin
   { intro h, subst h }
 end
 
-@[move_cast] theorem morph_div : ((a / b : γ) : α) = a / b :=
+@[simp, move_cast] theorem morph_div : ((a / b : γ) : α) = a / b :=
 by rw [division_def, morph.morph_mul, morph.morph_inv, ← division_def]
 
-@[move_cast] theorem morph_pow_nat (n : ℕ) : ((a ^ n : γ) : α) = a ^ n :=
+@[simp, move_cast] theorem morph_pow_nat (n : ℕ) : ((a ^ n : γ) : α) = a ^ n :=
 begin
   induction n with _ ih,
   { rw [pow_zero, pow_zero, morph.morph1] },
@@ -142,7 +141,7 @@ begin
     { rw [pow_succ, morph.morph_mul, ih, ← pow_succ] }}
 end
 
-@[move_cast] theorem morph_pow (n : ℤ) : ((a ^ n : γ) : α) = a ^ n :=
+@[simp, move_cast] theorem morph_pow (n : ℤ) : ((a ^ n : γ) : α) = a ^ n :=
 begin
   cases n,
   { rw [int.of_nat_eq_coe, fpow_of_nat, fpow_of_nat],
@@ -239,7 +238,7 @@ def term : nterm γ → nterm γ
 | (mul x (const a)) := x
 | x := x --should not happen
 
-theorem eval_scale {a : γ} {x : nterm γ} :
+@[simp] theorem eval_scale {a : γ} {x : nterm γ} :
   eval ρ (x.scale a) = eval ρ x * a :=
 begin
   unfold scale,
@@ -309,24 +308,22 @@ else if x.exp * n = 1 then
 else
   pow x.mem (x.exp * n)
 
-theorem eval_pow_mul {n : znum} {x : nterm γ} : eval ρ (pow_mul n x) = eval ρ x ^ (n : ℤ) :=
+@[simp] theorem eval_pow_mul {n : znum} {x : nterm γ} : eval ρ (pow_mul n x) = eval ρ x ^ (n : ℤ) :=
 begin
   unfold pow_mul,
   by_cases h1 : n = 0,
-  { rw [if_pos h1, h1, znum.cast_zero, fpow_zero], simp [eval] },
+  { simp [eval, h1] },
   { by_cases h2 : x.exp * n = 1,
     { rw [if_neg h1, if_pos h2, eval_mem_exp x],
       rw [← fpow_mul, ← znum.cast_mul, h2],
-      rw [znum.cast_one, fpow_one] },
+      simp },
     { rw [if_neg h1, if_neg h2], unfold eval,
       rw [znum.cast_mul, fpow_mul, ← eval_mem_exp]}}
 end
 
-def nonzero (ρ : dict α) (ts : list (nterm γ)) : Prop :=
-∀ t ∈ ts, nterm.eval ρ t ≠ 0
+def nonzero (ρ : dict α) (ts : list (nterm γ)) : Prop := ∀ t ∈ ts, nterm.eval ρ t ≠ 0
 
-theorem nonzero_union {xs ys : list (nterm γ)} :
-nonzero ρ (xs ∪ ys) ↔ nonzero ρ xs ∧ nonzero ρ ys :=
+theorem nonzero_union {xs ys : list (nterm γ)} : nonzero ρ (xs ∪ ys) ↔ nonzero ρ xs ∧ nonzero ρ ys :=
 begin
   apply iff.intro,
   { intro h1, split; { intros _ h2, apply h1, simp [h2] }},
@@ -334,8 +331,7 @@ begin
     {apply h1, apply ht}, {apply h2, apply ht}}
 end
 
-theorem nonzero_subset {xs ys : list (nterm γ)} :
-  xs ⊆ ys → nonzero ρ ys → nonzero ρ xs :=
+theorem nonzero_subset {xs ys : list (nterm γ)} : xs ⊆ ys → nonzero ρ ys → nonzero ρ xs :=
 begin
   intros h1 h2, intros x hx,
   apply h2, apply h1, apply hx

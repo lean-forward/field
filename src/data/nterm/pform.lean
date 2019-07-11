@@ -18,6 +18,9 @@ by apply morph.morph1
 
 private lemma eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ x := rfl
 
+local attribute [simp] eval_none
+local attribute [simp] eval_some
+
 private def to_pform : nterm γ → pform γ | x :=
 if x = const 1 then none else some x --TODO
 
@@ -25,8 +28,7 @@ private lemma eval_to_pform {x : nterm γ} : eval ρ (to_pform x : nterm γ) = e
 begin
   unfold to_pform,
   by_cases h1 : x = const 1,
-  { rw [if_pos h1, h1, eval_none], simp [eval] },
-  { rw [if_neg h1, eval_some] }
+  repeat { simp [h1, eval] },
 end
 
 private def mul' : pform γ → nterm γ → nterm γ
@@ -35,11 +37,7 @@ private def mul' : pform γ → nterm γ → nterm γ
 
 private lemma eval_mul' {x : pform γ} {y : nterm γ} :
   eval ρ (mul' x y) = eval ρ (x : nterm γ) * eval ρ y :=
-begin
-  cases x,
-  { unfold mul', rw [eval_none, one_mul]  },
-  { unfold mul', unfold eval, rw eval_some}
-end
+by cases x; simp [mul', eval]
 
 private def left : nterm γ → pform γ
 | (mul x _) := some x
@@ -57,8 +55,8 @@ theorem eval_left_right (x : nterm γ) :
   eval ρ x = eval ρ (left x : nterm γ) * eval ρ (right x) :=
 begin
   cases x,
-  case mul : x y { unfold left, unfold right, unfold eval, rw eval_some },
-  repeat { unfold left, unfold right, unfold eval, rw [eval_none, one_mul] }
+  case mul : x y { simp [left, right, eval] }, 
+  repeat { simp [left, right, eval] } 
 end
 
 theorem eval_rest_lead {P : nterm γ} :
@@ -66,17 +64,32 @@ theorem eval_rest_lead {P : nterm γ} :
 begin
   rw [eval_mem_exp, eval_left_right, mul_fpow],
   congr' 1,
-  { unfold rest, cases (mem P),
-    case mul : { dsimp [left, option.map], rw [eval_some, eval_some, eval_pow_mul] },
-    repeat { dsimp [left, option.map], rw [eval_none, one_fpow] }},
+  { unfold rest, cases (mem P); simp [left] },
   { unfold lead, rw eval_pow_mul }
 end
 
 private def mul_pform : pform γ → pform γ → pform γ
-| x y := mul' x y --TODO
+| (some x) (some y) := mul' (some x) y --TODO
+| none x := x
+| x none := x
+
+private lemma mul_pform_def1 {x : pform γ} :
+  mul_pform none x = x :=
+by cases x; unfold mul_pform
+
+private lemma mul_pform_def2 {x : pform γ} :
+  mul_pform x none = x :=
+by cases x; unfold mul_pform
+
+local attribute [simp] mul_pform_def1
+local attribute [simp] mul_pform_def2
 
 private lemma eval_mul_pform {P Q : pform γ} : eval ρ (mul_pform P Q : nterm γ) = eval ρ (P : nterm γ) * eval ρ (Q : nterm γ) :=
-by apply eval_mul'
+begin
+  cases P, { simp },
+  cases Q, { simp },
+  exact eval_mul'
+end
 
 protected def mul (x y : nterm γ) : nterm γ :=
 if x = const 0 ∨ y = const 0 then
@@ -88,7 +101,7 @@ theorem eval_mul {x y : nterm γ} : eval ρ (pform.mul x y) = eval ρ x * eval �
 begin
   unfold pform.mul,
   by_cases h1 : x = const 0 ∨ y = const 0,
-  { rw if_pos h1, cases h1; rw h1; simp [eval] },
+  { cases h1; simp [h1, eval] },
   { rw if_neg h1, unfold eval,
     rw [eval_mul_pform, eval_to_pform, eval_to_pform, morph.morph_mul],
     rw [mul_assoc, mul_comm (↑(coeff x)), ← mul_assoc (eval ρ (term y))],
