@@ -114,7 +114,7 @@ instance has_coe : has_coe γ α := morph.cast γ α
 @[simp, move_cast] theorem morph_sub : ((a - b : γ) : α) = a - b :=
 by rw [sub_eq_add_neg, morph.morph_add, morph.morph_neg, ← sub_eq_add_neg]
 
-@[elim_cast] theorem morph_inj' : ∀ a b : γ, (a : α) = b ↔ a = b :=
+@[simp, elim_cast] theorem morph_inj' : ∀ a b : γ, (a : α) = b ↔ a = b :=
 begin
   intros a b,
   apply iff.intro,
@@ -308,6 +308,12 @@ else if x.exp * n = 1 then
 else
   pow x.mem (x.exp * n)
 
+def pow_div (n : znum) (x : nterm γ) : nterm γ :=
+if n = x.exp then
+  x.mem
+else
+  pow x.mem (x.exp / n)
+
 @[simp] theorem eval_pow_mul {n : znum} {x : nterm γ} : eval ρ (pow_mul n x) = eval ρ x ^ (n : ℤ) :=
 begin
   unfold pow_mul,
@@ -319,6 +325,20 @@ begin
       simp },
     { rw [if_neg h1, if_neg h2], unfold eval,
       rw [znum.cast_mul, fpow_mul, ← eval_mem_exp]}}
+end
+
+@[simp] theorem eval_pow_div {n : znum} {x : nterm γ} : n ∣ x.exp → eval ρ (pow_div n x) ^ (n : ℤ) = eval ρ x :=
+begin
+  intro h1, cases h1 with d h1,
+  unfold pow_div,
+  by_cases h2 : n = exp x,
+  { rw [if_pos h2, h2, ← eval_mem_exp] },
+  { by_cases h3 : n = 0,
+    { apply absurd _ h2, have : exp x = 0, { rw h1, simp [h3] }, rw [h3, this] },
+    { rw [if_neg h2, h1], unfold eval,
+      rw [znum.div_to_int, znum.cast_mul, int.mul_div_cancel_left],
+      { rw [← fpow_mul, mul_comm, ← znum.cast_mul, ← h1, ← eval_mem_exp] },
+      { rw [← znum.cast_zero], exact_mod_cast h3 }}}
 end
 
 def nonzero (ρ : dict α) (ts : list (nterm γ)) : Prop := ∀ t ∈ ts, nterm.eval ρ t ≠ 0

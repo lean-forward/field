@@ -2,18 +2,15 @@ import .basic
 
 namespace nterm
 
-@[reducible] def pform (γ) [const_space γ] := option (nterm γ)
-
 namespace pform
 
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
---instance : has_one (pform γ) := ⟨none⟩
-instance : has_coe (pform γ) (nterm γ) := ⟨λ x, x.get_or_else (const 1)⟩
+instance : has_coe (option (nterm γ)) (nterm γ) := ⟨λ x, x.get_or_else (const 1)⟩
 
-private lemma eval_none : eval ρ ((none : pform γ) : nterm γ) = 1 :=
+private lemma eval_none : eval ρ ((none : option (nterm γ)) : nterm γ) = 1 :=
 by apply morph.morph1
 
 private lemma eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ x := rfl
@@ -21,7 +18,7 @@ private lemma eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ 
 local attribute [simp] eval_none
 local attribute [simp] eval_some
 
-private def to_pform : nterm γ → pform γ | x :=
+private def to_pform : nterm γ → option (nterm γ) | x :=
 if x = const 1 then none else some x --TODO
 
 private lemma eval_to_pform {x : nterm γ} : eval ρ (to_pform x : nterm γ) = eval ρ x :=
@@ -31,15 +28,31 @@ begin
   repeat { simp [h1, eval] },
 end
 
-private def mul' : pform γ → nterm γ → nterm γ
-| (some x) y := mul x y
+@[simp] theorem eval_pow_mul_option {x : option (nterm γ)} {n : znum} : eval ρ (x.map (pow_mul n) : nterm γ) = eval ρ (x : nterm γ) ^ (n : ℤ) :=
+by cases x; simp
+
+private def mul' : option (nterm γ) → nterm γ → nterm γ
+| (some x) y :=
+  let d := znum.gcd x.exp y.exp in
+    some $ pow_mul d $ mul (x.pow_div d) (y.pow_div d)
 | none y := y
 
-private lemma eval_mul' {x : pform γ} {y : nterm γ} :
+private lemma eval_mul' {x : option (nterm γ)} {y : nterm γ} :
   eval ρ (mul' x y) = eval ρ (x : nterm γ) * eval ρ y :=
-by cases x; simp [mul', eval]
+begin
+  cases x with x,
+  { simp [mul'] },
+  rw eval_some, unfold mul',
+  --generalize : d = znum.gcd (exp x) (exp y) : znum,
+  --have h1 : (d : znum) ∣ exp x, from sorry,
+  --have h2 : (d : znum) ∣ exp y, from sorry,
+  rw [eval_some, eval_pow_mul], unfold eval,
+  rw [mul_fpow, eval_pow_div, eval_pow_div],
+  { sorry },
+  { sorry }
+end
 
-private def left : nterm γ → pform γ
+private def left : nterm γ → option (nterm γ)
 | (mul x _) := some x
 | _ := none
 
@@ -47,7 +60,7 @@ private def right : nterm γ → (nterm γ)
 | (mul _ x) := x
 | x := x
 
-def rest (P : nterm γ) : pform γ := (left P.mem).map (pow_mul P.exp)
+def rest (P : nterm γ) : option (nterm γ) := (left P.mem).map (pow_mul P.exp)
 
 def lead (P : nterm γ) : nterm γ := pow_mul P.exp (right P.mem)
 
@@ -68,23 +81,80 @@ begin
   { unfold lead, rw eval_pow_mul }
 end
 
-private def mul_pform : pform γ → pform γ → pform γ
+inductive r : option (nterm γ) → option (nterm γ) → Prop
+| none {S : nterm γ} : r none (some S)
+| rest {S : nterm γ} : r (rest S) (some S)
+
+namespace wf
+
+private lemma acc_r_none : @acc (option (nterm γ)) r none :=
+begin
+  apply acc.intro, intros x h, cases h
+end
+
+private def g : nterm γ → ℕ
+| (add x _) := g x + 1
+| (mul x (const _)) := g x
+| _ := 0
+
+private def f : option (nterm γ) → ℕ
+| (some x) := g x + 1
+| none := 0
+
+private lemma g_scale {x : nterm γ} {a : γ} : g (x.scale a) ≤ g x :=
+begin
+  by_cases h1 : a = 0,
+  { simp [scale, h1, g] },
+  { cases x,
+    case mul : x y { cases y, repeat {simp [scale, h1, g] } },
+    repeat { simp [scale, h1, g] }}
+end
+
+private lemma f_none {S : nterm γ} : f (none : option (nterm γ)) < f (some S) :=
+by { unfold f, linarith }
+
+private lemma f_map_scale {x : option (nterm γ)} {a : γ} : f (x.map (scale a)) ≤ f x :=
+by { cases x; simp [f, g_scale] }
+
+private lemma f_rest {S : nterm γ} : f (rest S) < f (some S) :=
+begin
+  sorry
+end
+
+theorem r_wf : @well_founded (option (nterm γ)) r :=
+begin
+  apply subrelation.wf,
+  intros x y h,
+  show f x < f y,
+  cases h, { apply f_none }, { apply f_rest },
+  apply measure_wf
+end
+
+meta def rel_tac : tactic unit := `[exact ⟨psigma.lex r (λ _, r), psigma.lex_wf wf.r_wf (λ _, wf.r_wf)⟩]
+
+meta def dec_tac : tactic unit :=
+`[apply psigma.lex.left, assumption, done]
+<|> `[apply psigma.lex.right, assumption, done]
+
+end wf
+
+private def mul_option : option (nterm γ) → option (nterm γ) → option (nterm γ)
 | (some x) (some y) := mul' (some x) y --TODO
 | none x := x
 | x none := x
 
-private lemma mul_pform_def1 {x : pform γ} :
-  mul_pform none x = x :=
-by cases x; unfold mul_pform
+private lemma mul_pform_def1 {x : option (nterm γ)} :
+  mul_option none x = x :=
+by cases x; unfold mul_option
 
-private lemma mul_pform_def2 {x : pform γ} :
-  mul_pform x none = x :=
-by cases x; unfold mul_pform
+private lemma mul_pform_def2 {x : option (nterm γ)} :
+  mul_option x none = x :=
+by cases x; unfold mul_option
 
 local attribute [simp] mul_pform_def1
 local attribute [simp] mul_pform_def2
 
-private lemma eval_mul_pform {P Q : pform γ} : eval ρ (mul_pform P Q : nterm γ) = eval ρ (P : nterm γ) * eval ρ (Q : nterm γ) :=
+private lemma eval_mul_option {P Q : option (nterm γ)} : eval ρ (mul_option P Q : nterm γ) = eval ρ (P : nterm γ) * eval ρ (Q : nterm γ) :=
 begin
   cases P, { simp },
   cases Q, { simp },
@@ -95,7 +165,7 @@ protected def mul (x y : nterm γ) : nterm γ :=
 if x = const 0 ∨ y = const 0 then
   const 0
 else
-  mul (mul_pform (to_pform x.term) (to_pform y.term)) (const (x.coeff * y.coeff))
+  mul (mul_option (to_pform x.term) (to_pform y.term)) (const (x.coeff * y.coeff))
 
 theorem eval_mul {x y : nterm γ} : eval ρ (pform.mul x y) = eval ρ x * eval ρ y :=
 begin
@@ -103,7 +173,7 @@ begin
   by_cases h1 : x = const 0 ∨ y = const 0,
   { cases h1; simp [h1, eval] },
   { rw if_neg h1, unfold eval,
-    rw [eval_mul_pform, eval_to_pform, eval_to_pform, morph.morph_mul],
+    rw [eval_mul_option, eval_to_pform, eval_to_pform, morph.morph_mul],
     rw [mul_assoc, mul_comm (↑(coeff x)), ← mul_assoc (eval ρ (term y))],
     rw [← eval_term_coeff, mul_comm (eval ρ y), ← mul_assoc],
     rw [← eval_term_coeff] }
