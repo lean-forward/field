@@ -138,6 +138,40 @@ meta def dec_tac : tactic unit :=
 
 end wf
 
+private def aux (x y : nterm γ) (p1 p2 p3 : option (nterm γ)) : nterm γ :=
+if x.mem = y.mem then
+  if x.exp + y.exp = 0 then (p1 : nterm γ)
+  else mul' p1 (pow x.mem (x.exp + y.exp))
+else if lt x.term y.term then --TODO
+  mul' p2 x
+else
+  mul' p3 y
+
+private lemma eval_aux_1 {x y : nterm γ} {p1 p2 p3 : option (nterm γ)}
+  ( H0 : x.exp + y.exp ≠ 0)
+  ( H1 : eval ρ (p2 : nterm γ) = eval ρ (p1 : nterm γ) * eval ρ y )
+  ( H2 : eval ρ (p3 : nterm γ) = eval ρ (p1 : nterm γ) * eval ρ x ) :
+  eval ρ (aux x y p1 p2 p3) =  eval ρ (p1 : nterm γ) * eval ρ y * eval ρ x :=
+begin
+  unfold aux,
+  by_cases h1 : x.mem = y.mem,
+  { rw [if_pos h1, mul_assoc],
+    { rw if_neg H0, rw [eval_mul'], congr,
+      unfold eval,
+      by_cases h2 : exp x = 0,
+      { have : eval ρ x = 1, { rw [eval_mem_exp x, h2], simp }, rw [h1, h2, this, eval_mem_exp y], simp },
+      { by_cases h3 : eval ρ (mem x) = 0,
+        { have : eval ρ x = 0, { rw [eval_mem_exp x, h3, zero_fpow], rw ← znum.cast_zero, exact_mod_cast h2 },
+          rw [h3, zero_fpow, this, mul_zero],
+          rw ← znum.cast_zero, exact_mod_cast H0 },
+        { rw [znum.cast_add, fpow_add h3],
+          rw [← eval_mem_exp, h1, ← eval_mem_exp, mul_comm] }}}},
+  { rw if_neg h1,
+    by_cases h2 : x.term < y.term,
+    { rw if_pos h2, rw [eval_mul'], congr, apply H1 },
+    { rw if_neg h2, rw [mul_assoc, mul_comm (eval ρ y), ← mul_assoc, eval_mul'], congr, apply H2 }}
+end
+
 private def mul_option : option (nterm γ) → option (nterm γ) → option (nterm γ)
 | (some x) (some y) := mul' (some x) y --TODO
 | none x := x

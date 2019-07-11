@@ -300,6 +300,13 @@ begin
   repeat { dsimp [mem, exp, eval], rw fpow_one }
 end
 
+--theorem eval_mem_zero {x : nterm γ} : eval ρ x = 0 → eval ρ (mem x) = 0 :=
+--begin
+--  intro h1, cases x,
+--  case pow : x n { unfold mem, by_contradiction h2, exact fpow_ne_zero_of_ne_zero h2 _ h1 },
+--  repeat { exact h1 },
+--end
+
 def pow_mul (n : znum) (x : nterm γ) : nterm γ :=
 if n = 0 then
   const 1
