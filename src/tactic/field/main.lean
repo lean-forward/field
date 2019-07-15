@@ -40,17 +40,17 @@ namespace field
 
 @[derive decidable_eq, derive has_reflect]
 inductive eterm (γ : Type) [const_space γ] : Type
-| zero  {} : eterm
-| one   {} : eterm
-| const {} : γ → eterm
-| atom  {} : num → eterm
-| add   {} : eterm → eterm → eterm
-| sub   {} : eterm → eterm → eterm
-| mul   {} : eterm → eterm → eterm
-| div   {} : eterm → eterm → eterm
-| neg   {} : eterm → eterm
-| inv   {} : eterm → eterm
-| pow   {} : eterm → ℤ → eterm
+--| zero {} : eterm
+--| one  {} : eterm
+| nmrl {} : γ → eterm
+| atom {} : num → eterm
+| add  {} : eterm → eterm → eterm
+| sub  {} : eterm → eterm → eterm
+| mul  {} : eterm → eterm → eterm
+| div  {} : eterm → eterm → eterm
+| neg  {} : eterm → eterm
+| inv  {} : eterm → eterm
+| pow  {} : eterm → ℤ → eterm
 
 namespace eterm
 variables {α : Type} [discrete_field α]
@@ -58,9 +58,9 @@ variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
 def eval (ρ : dict α) : eterm γ → α
-| zero      := 0
-| one       := 1
-| (const r) := ↑r
+--| zero      := 0
+--| one       := 1
+| (nmrl n)  := ↑n
 | (atom i)  := ρ.val i
 | (add x y) := eval x + eval y
 | (sub x y) := eval x - eval y
@@ -71,9 +71,9 @@ def eval (ρ : dict α) : eterm γ → α
 | (pow x n) := eval x ^ n
 
 def to_nterm : eterm γ → nterm γ
-| zero      := 0
-| one       := 1
-| (const c) := c
+--| zero      := 0
+--| one       := 1
+| (nmrl n)  := (n : γ)
 | (atom i)  := i
 | (add x y) := to_nterm x + to_nterm y
 | (sub x y) := to_nterm x - to_nterm y
@@ -167,7 +167,7 @@ end
 
 meta def cache_ty.dict_expr (s : cache_ty) : tactic expr :=
 do
-    e ← s.dict.values.expr_reflect `(ℝ), --TODO: for any α
+    e ← s.dict.values.expr_reflect `(ℚ), --TODO: for any α
     mk_app `list.to_dict [e]
 
 @[reducible]
@@ -181,8 +181,8 @@ instance : const_space γ :=
 
 meta def eterm_of_expr : expr → state_dict (eterm γ) | e :=
 match e with
-| `(0 : ℝ) := return zero
-| `(1 : ℝ) := return one
+--| `(0) := return zero
+--| `(1) := return one
 | `(%%a + %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (add x y)
 | `(%%a - %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (sub x y)
 | `(%%a * %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (mul x y)
@@ -190,18 +190,8 @@ match e with
 | `(-%%a)      := do x ← eterm_of_expr a, return (neg x)
 | `((%%a)⁻¹)   := do x ← eterm_of_expr a, return (inv x)
 | `(%%a ^ %%b) := do n ← eval_expr ℤ b <|> (coe <$> eval_expr ℕ b), x ← eterm_of_expr a, return (pow x n)
-| `(↑%%a)      := do c ← eval_expr γ a, return (const c)
-| _ := failure
---| `(@has_coe.coe ℚ ℝ %%h %%a) := do c ← eval_expr γ a, return (const c)
+| _            := do n ← e.to_int, return (nmrl n)
 end <|> do i ← get_atom e, return (atom i)
-
---private meta def znum_of_expr : expr → option znum
---| `(@has_zero.zero %%α %%s)   := some 0
---| `(@has_one.one %%α %%s)     := some 1
---| `(@bit0 %%α %%s %%v)        := bit0 <$> znum_of_expr v
---| `(@bit1 %%α %%s1 %%s2 %%v)  := bit1 <$> znum_of_expr v
---| `(@has_neg.neg %%α %%s %%a) := has_neg.neg <$> znum_of_expr a
---| _                           := none <|> do i ← get_atom e, return (atom i)
 
 private meta def pexpr_of_pos_num (α h_one h_add : expr) : pos_num → pexpr
 | pos_num.one := ``(@has_one.one %%α %%h_one)
@@ -248,7 +238,7 @@ do
   ρ ← s.dict_expr,
 
   let nhyps := norm_hyps t,
-  nhyps ← monad.mapm (nterm_to_expr `(ℝ) s) nhyps,
+  nhyps ← monad.mapm (nterm_to_expr `(ℚ) s) nhyps,
   nhyps ← monad.mapm (λ e, to_expr ``(%%e ≠ 0)) nhyps,
   mvars ← monad.mapm mk_meta_var nhyps,
 
@@ -284,7 +274,7 @@ do
   pr2 ← mk_app `field.correctness [pr0],
 
   --reflexivity from nterm to expr
-  new_e ← nterm_to_expr `(ℝ) s norm_t,
+  new_e ← nterm_to_expr `(ℚ) s norm_t,
   h3 ← to_expr ``(nterm.eval %%ρ_expr %%norm_t_expr = %%new_e),
   pr3 ← mk_meta_var h3, --heavy computation in the kernel
 
@@ -310,6 +300,7 @@ do
   `(%%e1 = %%e2) ← target,
 
   (new_e1, pr1, mv1, mvs, s) ← norm_expr e1 ∅,
+  trace new_e1,
   (new_e2, pr2, mv2, mvs', s) ← norm_expr e2 s,
 
   ( do
