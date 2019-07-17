@@ -90,7 +90,7 @@ def smerge : list (cterm γ) → list (cterm γ) → list (cterm γ)
     let c := x.coeff + y.coeff in
     if hc : c = 0 then smerge xs ys
     else ⟨x.term, c, hc⟩ :: smerge xs ys
-  else if x.term < y.term then
+  else if x.term ≤ y.term then
     x :: smerge xs (y::ys)
   else
     y :: smerge (x::xs) ys
@@ -122,11 +122,11 @@ lemma smerge_def2 {x y : cterm γ} {xs ys : list (cterm γ)} :
   smerge (x::xs) (y::ys) = ⟨x.term, x.coeff + y.coeff, hc⟩ :: smerge xs ys :=
 by intros h1 h2; simp [smerge, h1, h2]
 lemma smerge_def3 {x y : cterm γ} {xs ys : list (cterm γ)} :
-  x.term ≠ y.term → x.term < y.term →
+  x.term ≠ y.term → x.term ≤ y.term →
   smerge (x::xs) (y::ys) = x :: smerge xs (y :: ys) :=
 by intros h1 h2; simp [smerge, h1, h2]
 lemma smerge_def4 {x y : cterm γ} {xs ys : list (cterm γ)} :
-  x.term ≠ y.term → ¬ x.term < y.term →
+  x.term ≠ y.term → ¬ x.term ≤ y.term →
   smerge (x::xs) (y::ys) = y :: smerge (x::xs) ys :=
 by intros h1 h2; simp [smerge, h1, h2]
 
@@ -156,7 +156,7 @@ begin
           repeat {rw [list.map_cons, list.sum_cons]},
           rw [eval_add, ihx ys], { simp },
           repeat {assumption }}},
-      { by_cases h2 : x.term < y.term,
+      { by_cases h2 : x.term ≤ y.term,
         { rw smerge_def3 h1 h2,
           repeat {rw [list.map_cons, list.sum_cons]},
           rw [ihx (y::ys), list.map_cons, list.sum_cons],

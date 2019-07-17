@@ -58,7 +58,7 @@ def pmerge : list (xterm γ) → list (xterm γ) → list (xterm γ)
 | (x::xs) (y::ys) :=
   if x.term = y.term then
     ⟨x.term, x.exp + y.exp⟩ :: pmerge xs ys
-  else if x.term < y.term then
+  else if x.term ≤ y.term then
     x :: pmerge xs (y::ys)
   else
     y :: pmerge (x::xs) ys
@@ -86,11 +86,11 @@ lemma pmerge_def1 {x y : xterm γ} {xs ys : list (xterm γ)} :
   pmerge (x::xs) (y::ys) = ⟨x.term, x.exp + y.exp⟩ :: pmerge xs ys :=
 by intro h; simp [pmerge, h]
 lemma pmerge_def2 {x y : xterm γ} {xs ys : list (xterm γ)} :
-  x.term ≠ y.term → x.term < y.term →
+  x.term ≠ y.term → x.term ≤ y.term →
   pmerge (x::xs) (y::ys) = x :: pmerge xs (y :: ys) :=
 by intros h1 h2; simp [pmerge, h1, h2]
 lemma pmerge_def3 {x y : xterm γ} {xs ys : list (xterm γ)} :
-  x.term ≠ y.term → ¬ x.term < y.term →
+  x.term ≠ y.term → ¬ x.term ≤ y.term →
   pmerge (x::xs) (y::ys) = y :: pmerge (x::xs) ys :=
 by intros h1 h2; simp [pmerge, h1, h2]
 
@@ -110,7 +110,7 @@ begin
         simp only [] at h1, rw h1 at *,
         repeat {rw [list.map_cons, list.prod_cons]},
         rw [eval_add, ihx ys], ring },
-      { by_cases h2 : x.term < y.term,
+      { by_cases h2 : x.term ≤ y.term,
         { rw pmerge_def2 h1 h2,
           repeat {rw [list.map_cons, list.prod_cons]},
           rw [ihx (y::ys), list.map_cons, list.prod_cons],

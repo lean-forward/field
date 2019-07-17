@@ -201,11 +201,8 @@ def ble :
 | (pow x n) (pow y m) := if x = y then n ≤ m else ble x y
 
 def le : nterm γ → nterm γ → Prop := λ x y, ble x y
-def lt : nterm γ → nterm γ → Prop := λ x y, ble x y ∧ x ≠ y
 instance : has_le (nterm γ) := ⟨le⟩
-instance : has_lt (nterm γ) := ⟨lt⟩
-instance dec_le : decidable_rel (@le γ _) := by dunfold le; apply_instance
-instance dec_lt : decidable_rel (@lt γ _) := by dunfold lt; apply_instance
+instance dec_le : decidable_rel ((≤) : nterm γ → nterm γ → Prop) := by { dsimp [has_le.le, le], apply_instance }
 
 --instance trans_le : is_trans _ (@le γ _) := by sorry
 --instance antisymm_le : is_antisymm _ (@le γ _) := by sorry
