@@ -1,6 +1,6 @@
-import .nterm
+import .basic
 
-namespace field
+namespace polya.field
 
 open nterm
 
@@ -360,5 +360,5 @@ end
 
 end pterm
 
-end field
+end polya.field
 

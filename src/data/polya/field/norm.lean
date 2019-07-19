@@ -8,7 +8,7 @@ by {intros a ha, apply list.mem_union_left, exact ha}
 
 end list
 
-namespace field
+namespace polya.field
 
 inductive alt (γ) [const_space γ] : bool → Type
 | sform : list (nterm γ) → sterm γ → alt tt
@@ -356,5 +356,5 @@ end
 
 end nterm
 
-end field
+end polya.field
 

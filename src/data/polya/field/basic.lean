@@ -57,7 +57,7 @@ end
 
 end list
 
-namespace field
+namespace polya.field
 
 structure dict (α : Type) :=
 (val : num → α)
@@ -322,4 +322,4 @@ end
 
 end nterm
 
-end field
+end polya.field

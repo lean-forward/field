@@ -1,10 +1,10 @@
-import tactic.field
+import tactic.polya.field
 
-open field tactic tactic.field
+open polya.field tactic tactic.polya.field
 
 meta def test_on (e : expr) : tactic unit :=
 do
-  (t, s) ← (eterm_of_expr e).run ∅,
+  (t, s) ← (term_of_expr e).run ∅,
   let nt := norm γ t,
   trace nt,
   nterm_to_expr s nt >>= trace
@@ -37,7 +37,7 @@ end
 
 run_cmd ( do
   e ← to_expr ``( (x * (1 / 2) + x * (1 / 2)) * x ⁻¹ ),
-  (new_e, pr, mv, l, s) ← field.norm_expr e ∅,
+  (new_e, pr, mv, l, s) ← norm_expr e ∅,
   trace new_e
 )
 
@@ -45,5 +45,5 @@ example : true :=
 by do
   e ← to_expr ``(x * x⁻¹),
   --this should create no new goals
-  (new_e, pr, mv, mvs, s) ← field.norm_expr e ∅,
+  (new_e, pr, mv, mvs, s) ← norm_expr e ∅,
   exact `(trivial)
