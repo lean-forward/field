@@ -18,10 +18,6 @@ variables [morph γ α] {ρ : dict α}
 instance : inhabited (cterm γ) := ⟨⟨nterm.const 0, 1, by simp⟩⟩
 
 def to_nterm (x : cterm γ) : nterm γ :=
---if x.coeff = 0 then 0
---else if x.coeff = 1 then x.term
---else if x.term = 1 then x.coeff
---else x.term * x.coeff
 x.term * x.coeff
 
 def eval (ρ : dict α) (x : cterm γ) : α :=
@@ -31,10 +27,6 @@ nterm.eval ρ x.term * ↑x.coeff
 def eval_to_nterm {x : cterm γ} :
  nterm.eval ρ x.to_nterm = cterm.eval ρ x :=
 begin
-  --by_cases h1 : x.coeff = 0;
-  --by_cases h2 : x.coeff = 1;
-  --by_cases h3 : x.term = 1;
-  --simp [nterm.eval, cterm.eval, to_nterm, h1, h2, h3]
   simp [to_nterm, nterm.eval, cterm.eval]
 end
 
@@ -90,7 +82,7 @@ def smerge : list (cterm γ) → list (cterm γ) → list (cterm γ)
     let c := x.coeff + y.coeff in
     if hc : c = 0 then smerge xs ys
     else ⟨x.term, c, hc⟩ :: smerge xs ys
-  else if x.term ≤ y.term then
+  else if x.term < y.term then
     x :: smerge xs (y::ys)
   else
     y :: smerge (x::xs) ys
@@ -122,11 +114,11 @@ lemma smerge_def2 {x y : cterm γ} {xs ys : list (cterm γ)} :
   smerge (x::xs) (y::ys) = ⟨x.term, x.coeff + y.coeff, hc⟩ :: smerge xs ys :=
 by intros h1 h2; simp [smerge, h1, h2]
 lemma smerge_def3 {x y : cterm γ} {xs ys : list (cterm γ)} :
-  x.term ≠ y.term → x.term ≤ y.term →
+  x.term ≠ y.term → x.term < y.term →
   smerge (x::xs) (y::ys) = x :: smerge xs (y :: ys) :=
 by intros h1 h2; simp [smerge, h1, h2]
 lemma smerge_def4 {x y : cterm γ} {xs ys : list (cterm γ)} :
-  x.term ≠ y.term → ¬ x.term ≤ y.term →
+  x.term ≠ y.term → ¬ x.term < y.term →
   smerge (x::xs) (y::ys) = y :: smerge (x::xs) ys :=
 by intros h1 h2; simp [smerge, h1, h2]
 
@@ -156,7 +148,7 @@ begin
           repeat {rw [list.map_cons, list.sum_cons]},
           rw [eval_add, ihx ys], { simp },
           repeat {assumption }}},
-      { by_cases h2 : x.term ≤ y.term,
+      { by_cases h2 : x.term < y.term,
         { rw smerge_def3 h1 h2,
           repeat {rw [list.map_cons, list.sum_cons]},
           rw [ihx (y::ys), list.map_cons, list.sum_cons],
@@ -236,25 +228,10 @@ begin
 end
 
 def to_nterm (S : sterm γ) : nterm γ :=
---match S.terms with
---| [] := 0
---| [x] := x.to_nterm
---| (x0::xs) :=
---  if x0.coeff = 1 then
---    sum (list.map cterm.to_nterm (x0::xs))
---  else
---    have h0 : x0.coeff⁻¹ ≠ 0, by simp [x0.pr],
---    ( nterm.sum
---      (xs.map (λ x, (x.mul x0.coeff⁻¹ h0).to_nterm))
---        + x0.term ) * x0.coeff
---end
 match S.terms with
 | [] := 0
 | [x] := x.to_nterm
 | (x0::xs) :=
-  --if x0.coeff = 1 then
-  --  sum (list.map cterm.to_nterm (x0::xs))
-  --else
     have h0 : x0.coeff⁻¹ ≠ 0, by simp [x0.pr],
     ( nterm.sum (xs.map (λ x, (x.mul x0.coeff⁻¹ h0).to_nterm))
       + x0.term * 1 ) * x0.coeff
@@ -268,18 +245,15 @@ begin
   { simp [eval, to_nterm] },
   cases xs with x1 xs,
   { simp [eval, to_nterm] },
-  --by_cases h1 : x0.coeff = 1,
-  --{ simp [eval, to_nterm, h1, nterm.eval_sum, cterm.eval_to_nterm'] },
 
   unfold eval, unfold to_nterm,
-  --rw [if_neg h1],
   rw [nterm.eval_mul, nterm.eval_add, nterm.eval_sum, nterm.eval_const],
   rw [← list.map_map cterm.to_nterm,
     list.map_map _ cterm.to_nterm,
     cterm.eval_to_nterm', list.map_map,
     ← cterm.eval_sum_mul],
   rw [add_mul, mul_assoc, ← morph.morph_mul, inv_mul_cancel,
-    morph.morph1, mul_one],
+    morph.morph_one', mul_one],
   swap, by simp [x0.pr],
   rw [list.map_cons, list.sum_cons],
   rw [nterm.eval_mul, nterm.eval_one, mul_one],

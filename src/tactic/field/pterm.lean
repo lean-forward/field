@@ -58,7 +58,7 @@ def pmerge : list (xterm γ) → list (xterm γ) → list (xterm γ)
 | (x::xs) (y::ys) :=
   if x.term = y.term then
     ⟨x.term, x.exp + y.exp⟩ :: pmerge xs ys
-  else if x.term ≤ y.term then
+  else if x.term < y.term then
     x :: pmerge xs (y::ys)
   else
     y :: pmerge (x::xs) ys
@@ -86,11 +86,11 @@ lemma pmerge_def1 {x y : xterm γ} {xs ys : list (xterm γ)} :
   pmerge (x::xs) (y::ys) = ⟨x.term, x.exp + y.exp⟩ :: pmerge xs ys :=
 by intro h; simp [pmerge, h]
 lemma pmerge_def2 {x y : xterm γ} {xs ys : list (xterm γ)} :
-  x.term ≠ y.term → x.term ≤ y.term →
+  x.term ≠ y.term → x.term < y.term →
   pmerge (x::xs) (y::ys) = x :: pmerge xs (y :: ys) :=
 by intros h1 h2; simp [pmerge, h1, h2]
 lemma pmerge_def3 {x y : xterm γ} {xs ys : list (xterm γ)} :
-  x.term ≠ y.term → ¬ x.term ≤ y.term →
+  x.term ≠ y.term → ¬ x.term < y.term →
   pmerge (x::xs) (y::ys) = y :: pmerge (x::xs) ys :=
 by intros h1 h2; simp [pmerge, h1, h2]
 
@@ -110,7 +110,7 @@ begin
         simp only [] at h1, rw h1 at *,
         repeat {rw [list.map_cons, list.prod_cons]},
         rw [eval_add, ihx ys], ring },
-      { by_cases h2 : x.term ≤ y.term,
+      { by_cases h2 : x.term < y.term,
         { rw pmerge_def2 h1 h2,
           repeat {rw [list.map_cons, list.prod_cons]},
           rw [ihx (y::ys), list.map_cons, list.prod_cons],
@@ -225,7 +225,7 @@ theorem eval_mul {P Q : pterm γ} :
 begin
   unfold pterm.eval, rw mul_coeff,
   by_cases h0 : P.coeff = 0 ∨ Q.coeff = 0,
-  { cases h0; simp [h0, morph.morph0] },
+  { cases h0; simp [h0, morph.morph_zero'] },
   { have : P.coeff ≠ 0 ∧ Q.coeff ≠ 0,
     from (decidable.not_or_iff_and_not _ _).mp h0,
     rw [mul_terms this, xterm.eval_pmerge, morph.morph_mul],
@@ -257,9 +257,6 @@ begin
 end
 
 def to_nterm (P : pterm γ) : nterm γ :=
---if P.terms.empty then P.coeff
---else if P.coeff = 1 then prod (P.terms.map (xterm.to_nterm))
---else prod (P.terms.map xterm.to_nterm) * P.coeff
 prod (P.terms.map xterm.to_nterm) * P.coeff
 
 theorem eval_to_nterm {P : pterm γ} :

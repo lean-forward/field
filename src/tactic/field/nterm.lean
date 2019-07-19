@@ -64,8 +64,8 @@ structure dict (α : Type) :=
 
 class morph (γ : Type) [discrete_field γ] (α : Type) [discrete_field α] :=
 (cast   : has_coe γ α)
-(morph0 : ((0 : γ) : α) = 0)
-(morph1 : ((1 : γ) : α) = 1)
+(morph_zero : ((0 : γ) : α) = 0)
+(morph_one : ((1 : γ) : α) = 1)
 (morph_add : ∀ a b : γ, ((a + b : γ) : α) = a + b)
 (morph_neg : ∀ a : γ, ((-a : γ) : α) = -a)
 (morph_mul : ∀ a b : γ, ((a * b : γ) : α) = a * b)
@@ -74,27 +74,6 @@ class morph (γ : Type) [discrete_field γ] (α : Type) [discrete_field α] :=
 
 namespace morph
 
-instance rat_morph {α} [discrete_field α] [char_zero α] : morph ℚ α :=
-{ cast      := by apply_instance,
-  morph0    := rat.cast_zero,
-  morph1    := rat.cast_one,
-  morph_add := rat.cast_add,
-  morph_neg := rat.cast_neg,
-  morph_mul := rat.cast_mul,
-  morph_inv := rat.cast_inv,
-  morph_inj := begin
-      intros a ha,
-      apply rat.cast_inj.mp,
-      { rw rat.cast_zero, apply ha },
-      { resetI, apply_instance }
-    end,
-}
-
-attribute [simp] morph.morph0
-attribute [simp] morph.morph1
-attribute [simp] morph.morph_mul
---TODO
-
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [discrete_field γ]
 variables [morph γ α]
@@ -102,20 +81,19 @@ variables {a b : γ}
 
 instance has_coe : has_coe γ α := morph.cast γ α
 
-@[squash_cast] theorem morph0' : ((0 : γ) : α) = 0 := by apply morph.morph0
-@[squash_cast] theorem morph1' : ((1 : γ) : α) = 1 := by apply morph.morph1
+@[simp, squash_cast] theorem morph_zero' : ((0 : γ) : α) = 0 := by apply morph.morph_zero
+@[simp, squash_cast] theorem morph_one'  : ((1 : γ) : α) = 1 := by apply morph.morph_one
 
-@[move_cast] theorem morph_add' : ∀ a b : γ, ((a + b : γ) : α) = a + b := by apply morph_add
-@[move_cast] theorem morph_neg' : ∀ a : γ, ((-a : γ) : α) = -a := by apply morph_neg
-@[move_cast] theorem morph_mul' : ∀ a b : γ, ((a * b : γ) : α) = a * b := by apply morph_mul
-@[move_cast] theorem morph_inv' : ∀ a : γ, ((a⁻¹ : γ) : α) = a⁻¹ := by apply morph_inv
+@[simp, move_cast] theorem morph_add' : ((a + b : γ) : α) = a + b := by apply morph_add
+@[simp, move_cast] theorem morph_neg' : ((-a : γ) : α) = -a       := by apply morph_neg
+@[simp, move_cast] theorem morph_mul' : ((a * b : γ) : α) = a * b := by apply morph_mul
+@[simp, move_cast] theorem morph_inv' : ((a⁻¹ : γ) : α) = a⁻¹     := by apply morph_inv
 
-@[move_cast] theorem morph_sub : ((a - b : γ) : α) = a - b :=
+@[simp, move_cast] theorem morph_sub : ((a - b : γ) : α) = a - b :=
 by rw [sub_eq_add_neg, morph.morph_add, morph.morph_neg, ← sub_eq_add_neg]
 
-@[elim_cast] theorem morph_inj' : ∀ a b : γ, (a : α) = b ↔ a = b :=
+@[simp, elim_cast] theorem morph_inj' : (a : α) = b ↔ a = b :=
 begin
-  intros a b,
   apply iff.intro,
   { intro h, apply eq_of_sub_eq_zero,
     apply morph.morph_inj (a - b),
@@ -125,51 +103,57 @@ begin
   { intro h, subst h }
 end
 
-@[move_cast] theorem morph_div : ((a / b : γ) : α) = a / b :=
+@[simp, move_cast] theorem morph_div : ((a / b : γ) : α) = a / b :=
 by rw [division_def, morph.morph_mul, morph.morph_inv, ← division_def]
 
-@[move_cast] theorem morph_pow_nat (n : ℕ) : ((a ^ n : γ) : α) = a ^ n :=
+@[simp, move_cast] theorem morph_pow_nat {n : ℕ} : ((a ^ n : γ) : α) = a ^ n :=
 begin
   induction n with _ ih,
-  { rw [pow_zero, pow_zero, morph.morph1] },
+  { rw [pow_zero, pow_zero, morph.morph_one] },
   { by_cases ha : a = 0,
-    { rw [ha, morph.morph0, zero_pow, zero_pow],
-      { apply morph.morph0 },
+    { rw [ha, morph.morph_zero, zero_pow, zero_pow],
+      { apply morph.morph_zero },
       { apply nat.succ_pos },
       { apply nat.succ_pos }},
     { rw [pow_succ, morph.morph_mul, ih, ← pow_succ] }}
 end
 
-@[move_cast] theorem morph_pow (n : ℤ) : ((a ^ n : γ) : α) = a ^ n :=
+@[simp, move_cast] theorem morph_pow {n : ℤ} : ((a ^ n : γ) : α) = a ^ n :=
 begin
   cases n,
   { rw [int.of_nat_eq_coe, fpow_of_nat, fpow_of_nat],
     apply morph_pow_nat },
   { rw [int.neg_succ_of_nat_coe, fpow_neg, fpow_neg],
-    rw [morph_div, morph.morph1],
+    rw [morph_div, morph.morph_one],
     rw [fpow_of_nat, fpow_of_nat],
     rw morph_pow_nat }
 end
+
+@[simp, squash_cast] theorem morph_nat {n : ℕ} : ((n : γ) : α) = (n : α) :=
+by { induction n with n ih, { simp }, { simp [ih] } }
+
+@[simp, squash_cast] theorem morph_num {n : num} : ((n : γ) : α) = (n : α) :=
+by rw [← num.cast_to_nat, ← num.cast_to_nat, morph_nat, num.cast_to_nat, num.cast_to_nat]
 
 end morph
 
 class const_space (γ : Type) : Type :=
 (df : discrete_field γ)
-(le : has_le γ)
-(dec_le : decidable_rel le.le)
+(lt : γ → γ → Prop)
+(dec : decidable_rel lt)
 
 namespace const_space
+
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 
 instance : discrete_field γ := const_space.df γ
-instance : has_le γ := const_space.le γ
-instance : decidable_rel (@has_le.le γ _) := const_space.dec_le γ
+instance : has_lt γ := ⟨const_space.lt⟩
+instance : decidable_rel ((<) : γ → γ → Prop) := const_space.dec γ
 
 end const_space
 
 @[derive decidable_eq, derive has_reflect]
---TODO: make γ explicit
 inductive nterm (γ : Type) [const_space γ] : Type
 | atom  {} : num → nterm
 | const {} : γ → nterm
@@ -184,39 +168,35 @@ variables [morph γ α] {ρ : dict α}
 
 instance : inhabited (nterm γ) := ⟨const 0⟩
 
-def ble :
+def blt :
   nterm γ → nterm γ → bool
-| (const a) (const b) := a ≤ b
+| (const a) (const b) := a < b
 | (const _) _         := tt
 | _         (const _) := ff
-| (atom i)  (atom j)  := i ≤ j
+| (atom i)  (atom j)  := i < j
 | (atom _)  _         := tt
 | _         (atom _)  := ff
-| (add x y) (add z w) := if y = w then ble x z else ble y w
+| (add x y) (add z w) := if y = w then blt x z else blt y w
 | (add _ _) _         := tt
 | _         (add _ _) := ff
-| (mul x y) (mul z w) := if y = w then ble x z else ble y w
+| (mul x y) (mul z w) := if y = w then blt x z else blt y w
 | (mul _ _) _         := tt
 | _         (mul _ _) := ff
-| (pow x n) (pow y m) := if x = y then n ≤ m else ble x y
+| (pow x n) (pow y m) := if x = y then n < m else blt x y
 
-def le : nterm γ → nterm γ → Prop := λ x y, ble x y
-instance : has_le (nterm γ) := ⟨le⟩
-instance dec_le : decidable_rel ((≤) : nterm γ → nterm γ → Prop) := by { dsimp [has_le.le, le], apply_instance }
-
---instance trans_le : is_trans _ (@le γ _) := by sorry
---instance antisymm_le : is_antisymm _ (@le γ _) := by sorry
---instance is_total : is_total _ (@le γ _) := by sorry
+def lt : nterm γ → nterm γ → Prop := λ x y, blt x y
+instance : has_lt (nterm γ) := ⟨lt⟩
+instance dec_lt : decidable_rel (@lt γ _) := by dunfold lt; apply_instance
 
 instance coe_atom : has_coe num (nterm γ) := ⟨atom⟩
 instance coe_const: has_coe γ (nterm γ) := ⟨const⟩
-instance : has_zero (nterm γ) := ⟨const 0⟩
-instance : has_one (nterm γ) := ⟨const 1⟩
+instance : has_zero (nterm γ) := ⟨mul (const 1) (const 0)⟩
+instance : has_one (nterm γ) := ⟨mul (const 1) (const 1)⟩
 instance : has_add (nterm γ) := ⟨add⟩
 instance : has_mul (nterm γ) := ⟨mul⟩
 instance : has_pow (nterm γ) znum := ⟨pow⟩
-instance pow_nat : has_pow (nterm γ) ℕ := ⟨λ x n, x.pow (n : znum)⟩ --test
-instance pow_int : has_pow (nterm γ) ℤ := ⟨λ x n, x.pow (n : znum)⟩ --test
+instance pow_int : has_pow (nterm γ) ℤ := ⟨λ x n, x.pow (n : znum)⟩
+instance pow_nat : has_pow (nterm γ) ℕ := ⟨λ (x : nterm γ) (n : ℕ), x ^ (n : ℤ)⟩
 
 def neg (x : nterm γ) : nterm γ := x * (-1 : γ)
 instance : has_neg (nterm γ) := ⟨neg⟩
@@ -235,21 +215,22 @@ def eval (ρ : dict α) : nterm γ → α
 | (pow x n) := eval x ^ (n : ℤ)
 
 section
-variables {x y : nterm γ} {i : num} {n : znum} {c : γ}
-@[simp] theorem eval_zero : (0 : nterm γ).eval ρ = 0 := by apply morph.morph0
-@[simp] theorem eval_one : (1 : nterm γ).eval ρ = 1 := by apply morph.morph1
+variables {x y : nterm γ} {i : num} {c : γ}
+@[simp] theorem eval_zero : (0 : nterm γ).eval ρ = 0 := by sorry
+@[simp] theorem eval_one : (1 : nterm γ).eval ρ = 1 := by sorry
 @[simp] theorem eval_atom : (i : nterm γ).eval ρ = ρ.val i := rfl
 @[simp] theorem eval_const : (c : nterm γ).eval ρ = c := rfl
 @[simp] theorem eval_add : (x + y).eval ρ = x.eval ρ + y.eval ρ := rfl
 @[simp] theorem eval_mul : (x * y).eval ρ = x.eval ρ * y.eval ρ := rfl
-@[simp] theorem eval_pow : (x ^ n).eval ρ = x.eval ρ ^ (n : ℤ) := rfl
-@[simp] theorem eval_pow_zero : (x ^ (0 : znum)).eval ρ = 1 := by simp
+@[simp] theorem eval_pow_int {n : ℤ} : (x ^ n).eval ρ = x.eval ρ ^ n := by sorry
+@[simp] theorem eval_pow_nat {n : ℕ} : eval ρ (x ^ n) = eval ρ x ^ n := eval_pow_int
+@[simp] theorem eval_pow {n : znum} : eval ρ (x ^ n) = eval ρ x ^ (n : ℤ) := by sorry
 
 @[simp] theorem eval_neg : (-x).eval ρ = - x.eval ρ :=
 calc
 eval ρ (-x)
     = eval ρ (neg x) : rfl
-... = - eval ρ x     : by simp [neg, morph.morph_neg, morph.morph1]
+... = - eval ρ x     : by simp [neg, morph.morph_neg', morph.morph_one']
 
 @[simp] theorem eval_sub : (x - y).eval ρ = x.eval ρ - y.eval ρ :=
 calc
@@ -274,7 +255,7 @@ end
 
 meta def to_str [has_to_string γ] : (nterm γ) → string
 | (atom i)  := "#" ++ to_string (i : ℕ)
-| (const c) := to_string c
+| (const c) := "(" ++ to_string c ++ ")"
 | (add x y) := "(" ++ to_str x ++ " + " ++ to_str y ++ ")"
 | (mul x y) := "(" ++ to_str x ++ " * " ++ to_str y ++ ")"
 | (pow x n) := to_str x ++ " ^ " ++ to_string (n : ℤ)

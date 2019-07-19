@@ -1,5 +1,31 @@
 import .norm
 
+namespace rat
+
+instance : field.const_space ℚ :=
+{ df := by apply_instance,
+  lt := (<),
+  dec := by apply_instance,
+}
+
+instance {α} [discrete_field α] [char_zero α] : field.morph ℚ α :=
+{ cast       := by apply_instance,
+  morph_zero := rat.cast_zero,
+  morph_one  := rat.cast_one,
+  morph_add  := rat.cast_add,
+  morph_neg  := rat.cast_neg,
+  morph_mul  := rat.cast_mul,
+  morph_inv  := rat.cast_inv,
+  morph_inj  := begin
+      intros a ha,
+      apply rat.cast_inj.mp,
+      { rw rat.cast_zero, apply ha },
+      { resetI, apply_instance }
+    end,
+}
+
+end rat
+
 namespace list
 
 def pall {α : Type*} (l : list α) (f : α → Prop) : Prop :=
@@ -39,28 +65,24 @@ end list
 namespace field
 
 @[derive decidable_eq, derive has_reflect]
-inductive eterm (γ : Type) [const_space γ] : Type
---| zero {} : eterm
---| one  {} : eterm
-| nmrl {} : γ → eterm
-| atom {} : num → eterm
-| add  {} : eterm → eterm → eterm
-| sub  {} : eterm → eterm → eterm
-| mul  {} : eterm → eterm → eterm
-| div  {} : eterm → eterm → eterm
-| neg  {} : eterm → eterm
-| inv  {} : eterm → eterm
-| pow  {} : eterm → ℤ → eterm
+inductive eterm : Type
+| atom : num → eterm
+| add  : eterm → eterm → eterm
+| sub  : eterm → eterm → eterm
+| mul  : eterm → eterm → eterm
+| div  : eterm → eterm → eterm
+| neg  : eterm → eterm
+| inv  : eterm → eterm
+| numeral : ℕ → eterm
+| pow_nat : eterm → ℕ → eterm
+| pow_int : eterm → ℤ → eterm
 
 namespace eterm
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
-def eval (ρ : dict α) : eterm γ → α
---| zero      := 0
---| one       := 1
-| (nmrl n)  := ↑n
+def eval (ρ : dict α) : eterm → α
 | (atom i)  := ρ.val i
 | (add x y) := eval x + eval y
 | (sub x y) := eval x - eval y
@@ -68,26 +90,26 @@ def eval (ρ : dict α) : eterm γ → α
 | (div x y) := (eval x) / (eval y)
 | (neg x)   := - eval x
 | (inv x)   := (eval x)⁻¹
-| (pow x n) := eval x ^ n
+| (numeral n)   := (n : α)
+| (pow_nat x n) := eval x ^ n
+| (pow_int x n) := eval x ^ n
 
-def to_nterm : eterm γ → nterm γ
---| zero      := 0
---| one       := 1
-| (nmrl n)  := (n : γ)
-| (atom i)  := i
+def to_nterm : eterm → nterm γ
+| (atom i)  := nterm.atom i
 | (add x y) := to_nterm x + to_nterm y
 | (sub x y) := to_nterm x - to_nterm y
 | (mul x y) := to_nterm x * to_nterm y
 | (div x y) := to_nterm x / to_nterm y
 | (neg x)   := - to_nterm x
 | (inv x)   := (to_nterm x)⁻¹
-| (pow x n) := to_nterm x ^ (n : znum)
+| (numeral n)   := (nterm.const (n : γ))
+| (pow_nat x n) := to_nterm x ^ n
+| (pow_int x n) := to_nterm x ^ n
 
-theorem correctness {x : eterm γ} :
-  nterm.eval ρ (to_nterm x) = eval ρ x :=
+theorem correctness {x : eterm} :
+  nterm.eval ρ (@to_nterm γ _ x) = eval ρ x :=
 begin
   induction x with
-    c           --const
     i           --atom
     x y ihx ihy --add
     x y ihx ihy --sub
@@ -95,30 +117,33 @@ begin
     x y ihx ihy --div
     x ihx       --neg
     x ihx       --inv
-    x n ihx;    --pow
-  unfold to_nterm; unfold eterm.eval,
-  repeat { simp },
-  repeat { simp [ihx] },
-  repeat { simp [ihx, ihy] }
+    n           --numeral
+    x n ihx     --pow_nat
+    x n ihx,    --pow_int
+  repeat { unfold to_nterm, unfold eval },
+  repeat { simp [nterm.eval] },
+  repeat { simp [nterm.eval, ihx] },
+  repeat { simp [nterm.eval, ihx, ihy] },
+
 end
 
 end eterm
 
 section norm
 
+def norm (γ : Type) [const_space γ] (x : eterm) : nterm γ :=
+x.to_nterm.norm
+
+def norm_hyps (γ : Type) [const_space γ] (x : eterm) : list (nterm γ) :=
+x.to_nterm.norm_hyps
+
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
 variables [morph γ α] {ρ : dict α}
 
-def norm (x : eterm γ) : nterm γ :=
-x.to_nterm.norm
-
-def norm_hyps (x : eterm γ) : list (nterm γ) :=
-x.to_nterm.norm_hyps
-
-theorem correctness {x : eterm γ} {ρ : dict α} :
-  (∀ t ∈ norm_hyps x, nterm.eval ρ t ≠ 0) →
-  eterm.eval ρ x = nterm.eval ρ (norm x) :=
+theorem correctness {x : eterm} {ρ : dict α} :
+  (∀ t ∈ norm_hyps γ x, nterm.eval ρ t ≠ 0) →
+  eterm.eval ρ x = nterm.eval ρ (norm γ x) :=
 begin
   intro H,
   unfold norm,
@@ -170,79 +195,83 @@ do
     e ← s.dict.values.expr_reflect `(ℚ), --TODO: for any α
     mk_app `list.to_dict [e]
 
-@[reducible]
-def γ := ℚ
 
-instance : const_space γ :=
-{ df := by apply_instance,
-  le := by apply_instance,
-  dec_le := by apply_instance,
-}
-
-meta def eterm_of_expr : expr → state_dict (eterm γ) | e :=
+meta def eterm_of_expr : expr → state_dict eterm | e :=
 match e with
---| `(0) := return zero
---| `(1) := return one
 | `(%%a + %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (add x y)
 | `(%%a - %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (sub x y)
 | `(%%a * %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (mul x y)
 | `(%%a / %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (div x y)
 | `(-%%a)      := do x ← eterm_of_expr a, return (neg x)
 | `((%%a)⁻¹)   := do x ← eterm_of_expr a, return (inv x)
-| `(%%a ^ %%b) := do n ← eval_expr ℤ b <|> (coe <$> eval_expr ℕ b), x ← eterm_of_expr a, return (pow x n)
-| _            := do n ← e.to_int, return (nmrl n)
+| `(%%a ^ %%b) := do x ← eterm_of_expr a, ( (do n ← b.to_nat, return (pow_nat x n)) <|> (do n ← b.to_int, return (pow_int x n)) )
+| _            := do n ← e.to_nat, return (numeral n)
 end <|> do i ← get_atom e, return (atom i)
 
 private meta def pexpr_of_pos_num (α h_one h_add : expr) : pos_num → pexpr
-| pos_num.one := ``(@has_one.one %%α %%h_one)
+| pos_num.one      := ``(@has_one.one %%α %%h_one)
 | (pos_num.bit0 n) := ``(@bit0 %%α %%h_add (%%(pexpr_of_pos_num n)))
 | (pos_num.bit1 n) := ``(@bit1 %%α %%h_one %%h_add (%%(pexpr_of_pos_num n)))
 
 private meta def expr_of_num (α : expr) (n : num) : tactic expr :=
 match n with
 | num.zero := do
-  h_zero ← mk_app `has_zero [α] >>= mk_instance',
+  h_zero ← mk_app `has_zero [α] >>= mk_instance,
   to_expr ``(@has_zero.zero %%α %%h_zero)
 | (num.pos (pos_num.one)) := do
-  h_one ← mk_app `has_one [α] >>= mk_instance',
+  h_one ← mk_app `has_one [α] >>= mk_instance,
   to_expr ``(@has_one.one %%α %%h_one)
 | (num.pos m) := do
-  h_one ← mk_app `has_one [α] >>= mk_instance',
-  h_add ← mk_app `has_add [α] >>= mk_instance',
+  h_one ← mk_app `has_one [α] >>= mk_instance,
+  h_add ← mk_app `has_add [α] >>= mk_instance,
   to_expr (pexpr_of_pos_num α h_one h_add m)
 end
 
 private meta def expr_of_znum (α : expr) (n : znum) : tactic expr :=
 match n with
 | znum.zero := do
-  h_zero ← mk_app `has_zero [α] >>= mk_instance',
+  h_zero ← mk_app `has_zero [α] >>= mk_instance,
   to_expr ``(@has_zero.zero %%α %%h_zero)
 | (znum.pos n) :=
   expr_of_num α (num.pos n)
 | (znum.neg n) := do
-  h_neg ← mk_app `has_neg [α] >>= mk_instance',
+  h_neg ← mk_app `has_neg [α] >>= mk_instance,
   e ← expr_of_num α (num.pos n),
   to_expr ``(@has_neg.neg %%α %%h_neg %%e)
 end
 
-meta def nterm_to_expr (α : expr) (s : cache_ty) : nterm γ → tactic expr
+--TODO: more generic
+@[reducible] def α := ℚ
+@[reducible] def γ := ℚ
+
+meta def const_aux (c : γ) : tactic expr :=
+let n := c.num in
+let d := c.denom in
+if d = 1 then
+  expr_of_znum `(α) (n : znum)
+else do
+  a ← expr_of_znum `(α) (n : znum),
+  b ← expr_of_znum `(α) (d : znum),
+  to_expr ``(%%a / %%b)
+
+meta def nterm_to_expr (s : cache_ty) : nterm γ → tactic expr
 | (nterm.atom i)  := s.dict.find i
-| (nterm.const c) := to_expr ``(%%(rat.reflect c) : %%α)
+| (nterm.const c) := const_aux c
 | (nterm.add x y) := do a ← nterm_to_expr x, b ← nterm_to_expr y, to_expr ``(%%a + %%b)
 | (nterm.mul x y) := do a ← nterm_to_expr x, b ← nterm_to_expr y, to_expr ``(%%a * %%b)
 | (nterm.pow x n) := do a ← nterm_to_expr x, b ← expr_of_znum `(ℤ) n, to_expr ``(%%a ^ %%b)
 
-meta def prove_norm_hyps (t : eterm ℚ) (s : cache_ty) : tactic (list expr × expr) :=
+meta def prove_norm_hyps (t : eterm) (s : cache_ty) : tactic (list expr × expr) :=
 do
   let t_expr : expr := reflect t,
   ρ ← s.dict_expr,
 
-  let nhyps := norm_hyps t,
-  nhyps ← monad.mapm (nterm_to_expr `(ℚ) s) nhyps,
+  let nhyps := norm_hyps γ t,
+  nhyps ← monad.mapm (nterm_to_expr s) nhyps,
   nhyps ← monad.mapm (λ e, to_expr ``(%%e ≠ 0)) nhyps,
   mvars ← monad.mapm mk_meta_var nhyps,
 
-  h ← to_expr ``(∀ x ∈ norm_hyps %%t_expr, nterm.eval %%ρ x ≠ 0),
+  h ← to_expr ``(∀ x ∈ norm_hyps γ %%t_expr, nterm.eval %%ρ x ≠ 0),
   pe ← to_expr ( mvars.foldr (λ e pe, ``((and.intro %%e %%pe))) ``(trivial) ) tt ff,
   ((), pr) ← solve_aux h (refine ``(list.pall_iff_forall_prop.mp _) >> exact pe >> done),
 
@@ -259,8 +288,9 @@ meta def norm_expr (e : expr) (s : cache_ty) :
 do
   (t, s) ← (eterm_of_expr e).run s,
   let t_expr : expr := reflect t,
-  let norm_t := norm t,
-  norm_t_expr ← to_expr ``(norm %%t_expr),
+  let norm_t := norm γ t,
+  trace norm_t,
+  norm_t_expr ← to_expr ``(norm γ %%t_expr),
   ρ_expr ← s.dict_expr,
 
   (mvars, pr0) ← prove_norm_hyps t s,
@@ -274,7 +304,7 @@ do
   pr2 ← mk_app `field.correctness [pr0],
 
   --reflexivity from nterm to expr
-  new_e ← nterm_to_expr `(ℚ) s norm_t,
+  new_e ← nterm_to_expr s norm_t,
   h3 ← to_expr ``(nterm.eval %%ρ_expr %%norm_t_expr = %%new_e),
   pr3 ← mk_meta_var h3, --heavy computation in the kernel
 
@@ -300,7 +330,6 @@ do
   `(%%e1 = %%e2) ← target,
 
   (new_e1, pr1, mv1, mvs, s) ← norm_expr e1 ∅,
-  trace new_e1,
   (new_e2, pr2, mv2, mvs', s) ← norm_expr e2 s,
 
   ( do
