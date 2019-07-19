@@ -80,17 +80,29 @@ def eval (ρ : dict α) : term → α
 | (pow_nat x n) := eval x ^ n
 | (pow_int x n) := eval x ^ n
 
+--def to_nterm : term → nterm γ
+--| (atom i)  := nterm.atom i
+--| (add x y) := to_nterm x + to_nterm y
+--| (sub x y) := to_nterm x - to_nterm y
+--| (mul x y) := to_nterm x * to_nterm y
+--| (div x y) := to_nterm x / to_nterm y
+--| (neg x)   := - to_nterm x
+--| (inv x)   := (to_nterm x)⁻¹
+--| (numeral n)   := (nterm.const (n : γ))
+--| (pow_nat x n) := to_nterm x ^ n
+--| (pow_int x n) := to_nterm x ^ n
+
 def to_nterm : term → nterm γ
 | (atom i)  := nterm.atom i
-| (add x y) := to_nterm x + to_nterm y
-| (sub x y) := to_nterm x - to_nterm y
-| (mul x y) := to_nterm x * to_nterm y
-| (div x y) := to_nterm x / to_nterm y
-| (neg x)   := - to_nterm x
-| (inv x)   := (to_nterm x)⁻¹
-| (numeral n)   := (nterm.const (n : γ))
-| (pow_nat x n) := to_nterm x ^ n
-| (pow_int x n) := to_nterm x ^ n
+| (add x y) := nterm.add (to_nterm x) (to_nterm y)
+| (sub x y) := nterm.add (to_nterm x) (nterm.mul (to_nterm y) (nterm.const (-1)))
+| (mul x y) := nterm.mul (to_nterm x) (to_nterm y)
+| (div x y) := nterm.mul (to_nterm x) (nterm.pow (to_nterm y) (-1))
+| (neg x)   := nterm.mul (to_nterm x) (nterm.const (-1))
+| (inv x)   := nterm.pow (to_nterm x) (-1)
+| (numeral n)   := nterm.const (n : γ)
+| (pow_nat x n) := nterm.pow (to_nterm x) (n : znum)
+| (pow_int x n) := nterm.pow (to_nterm x) (n : znum)
 
 theorem correctness {x : term} : nterm.eval ρ (@to_nterm γ _ x) = eval ρ x :=
 begin
@@ -108,23 +120,10 @@ begin
   repeat { unfold to_nterm, unfold eval },
   repeat { simp [nterm.eval] },
   repeat { simp [nterm.eval, ihx] },
-  repeat { simp [nterm.eval, ihx, ihy] }
+  repeat { simp [nterm.eval, ihx, ihy] },
+  { rw [fpow_inv, division_def] },
+  { rw fpow_inv }
 end
-
---def to_nterm : term → nterm γ
---| (atom i)  := nterm.atom i
---| (add x y) := nterm.add (to_nterm x) (to_nterm y)
---| (sub x y) := nterm.add (to_nterm x) (nterm.mul (to_nterm y) (nterm.const (-1)))
---| (mul x y) := nterm.mul (to_nterm x) (to_nterm y)
---| (div x y) := nterm.mul (to_nterm x) (nterm.pow (to_nterm y) (-1))
---| (neg x)   := nterm.mul (to_nterm x) (nterm.const (-1))
---| (inv x)   := nterm.pow (to_nterm x) (-1)
---| (numeral n)   := nterm.const (n : γ)
---| (pow_nat x n) := nterm.pow (to_nterm x) (n : znum)
---| (pow_int x n) := nterm.pow (to_nterm x) (n : znum)
---
---theorem correctness {x : term} : nterm.eval ρ (@to_nterm γ _ x) = eval ρ x :=
---by sorryk
 
 end term
 

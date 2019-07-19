@@ -64,9 +64,6 @@ end list
 --
 --end finmap
 
-namespace polya.field
-end polya.field
-
 namespace tactic
 open native tactic
 
