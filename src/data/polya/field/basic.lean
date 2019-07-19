@@ -188,6 +188,13 @@ def lt : nterm γ → nterm γ → Prop := λ x y, blt x y
 instance : has_lt (nterm γ) := ⟨lt⟩
 instance dec_lt : decidable_rel (@lt γ _) := by dunfold lt; apply_instance
 
+def eval (ρ : dict α) : nterm γ → α
+| (atom i)  := ρ.val i
+| (const c) := ↑c
+| (add x y) := eval x + eval y
+| (mul x y) := eval x * eval y
+| (pow x n) := eval x ^ (n : ℤ)
+
 instance coe_atom : has_coe num (nterm γ) := ⟨atom⟩
 instance coe_const: has_coe γ (nterm γ) := ⟨const⟩
 instance : has_zero (nterm γ) := ⟨mul (const 1) (const 0)⟩
@@ -207,22 +214,17 @@ instance : has_inv (nterm γ) := ⟨inv⟩
 def div (x y : nterm γ) : nterm γ := x * y⁻¹
 instance : has_div (nterm γ) := ⟨div⟩
 
-def eval (ρ : dict α) : nterm γ → α
-| (atom i)  := ρ.val i
-| (const c) := ↑c
-| (add x y) := eval x + eval y
-| (mul x y) := eval x * eval y
-| (pow x n) := eval x ^ (n : ℤ)
-
 section
 variables {x y : nterm γ} {i : num} {c : γ}
-@[simp] theorem eval_zero : (0 : nterm γ).eval ρ = 0 := by sorry
-@[simp] theorem eval_one : (1 : nterm γ).eval ρ = 1 := by sorry
-@[simp] theorem eval_atom : (i : nterm γ).eval ρ = ρ.val i := rfl
-@[simp] theorem eval_const : (c : nterm γ).eval ρ = c := rfl
-@[simp] theorem eval_add : (x + y).eval ρ = x.eval ρ + y.eval ρ := rfl
-@[simp] theorem eval_mul : (x * y).eval ρ = x.eval ρ * y.eval ρ := rfl
-@[simp] theorem eval_pow_int {n : ℤ} : (x ^ n).eval ρ = x.eval ρ ^ n := by sorry
+@[simp] theorem eval_zero :  eval ρ (0 : nterm γ) = 0       := by sorry
+@[simp] theorem eval_one :   eval ρ (1 : nterm γ) = 1       := by sorry
+@[simp] theorem eval_atom :  eval ρ (i : nterm γ) = ρ.val i := rfl
+@[simp] theorem eval_const : eval ρ (c : nterm γ) = (c : α) := rfl
+
+@[simp] theorem eval_add : eval ρ (x + y) = eval ρ x + eval ρ y := rfl
+@[simp] theorem eval_mul : eval ρ (x * y) = eval ρ x * eval ρ y := rfl
+
+@[simp] theorem eval_pow_int {n : ℤ} : eval ρ (x ^ n) = eval ρ x ^ n := by sorry
 @[simp] theorem eval_pow_nat {n : ℕ} : eval ρ (x ^ n) = eval ρ x ^ n := eval_pow_int
 @[simp] theorem eval_pow {n : znum} : eval ρ (x ^ n) = eval ρ x ^ (n : ℤ) := by sorry
 
@@ -232,20 +234,20 @@ eval ρ (-x)
     = eval ρ (neg x) : rfl
 ... = - eval ρ x     : by simp [neg, morph.morph_neg', morph.morph_one']
 
-@[simp] theorem eval_sub : (x - y).eval ρ = x.eval ρ - y.eval ρ :=
+@[simp] theorem eval_sub : eval ρ (x - y) = eval ρ x - eval ρ y :=
 calc
 eval ρ (x - y)
     = eval ρ (sub x y)    : rfl
 ... = eval ρ x - eval ρ y : by simp [sub, sub_eq_add_neg]
 
-@[simp] theorem eval_inv : (x⁻¹).eval ρ = (x.eval ρ)⁻¹ :=
+@[simp] theorem eval_inv : eval ρ (x⁻¹) = (eval ρ x)⁻¹ :=
 calc
 eval ρ (x⁻¹)
     = eval ρ (inv x)        : rfl
 ... = (eval ρ x) ^ (-1 : ℤ) : by simp [inv, eval]
 ... = (eval ρ x)⁻¹          : fpow_inv _
 
-@[simp] theorem eval_div : (x / y).eval ρ = x.eval ρ / y.eval ρ :=
+@[simp] theorem eval_div : eval ρ (x / y) = eval ρ x / eval ρ y :=
 calc
 eval ρ (x / y)
     = eval ρ (div x y)    : rfl
@@ -264,33 +266,34 @@ meta instance [has_to_string γ] : has_to_string (nterm γ) := ⟨to_str⟩
 meta instance [has_to_string γ] : has_to_tactic_format (nterm γ) := ⟨λ x, return (to_str x : format)⟩
 
 def sum : list (nterm γ) → nterm γ
-| []      := (0 : nterm γ)
+| []      := const (0 : γ)
 | [x]     := x
-| (x::xs) := sum xs + x
+| (x::xs) := add (sum xs) x
 
 def prod : list (nterm γ) → nterm γ
-| []      := (1 : nterm γ) 
+| []      := const (1 : γ) 
 | [x]     := x
-| (x::xs) := prod xs * x
+| (x::xs) := mul (prod xs) x
 
 theorem eval_sum (xs : list (nterm γ)) :
   (sum xs).eval ρ = list.sum (xs.map (nterm.eval ρ)) :=
 begin
   induction xs with x0 xs ih,
-  { simp [sum] },
+  { simp [sum, eval] },
   { cases xs with x1 xs,
-    { simp [sum] },
-    { unfold sum, rw [list.map_cons, list.sum_cons, eval_add, ih, add_comm] }}
+    { simp [sum, eval] },
+    { simp [sum, eval, ih] }}
 end
 
 theorem eval_prod (xs : list (nterm γ)) :
   (prod xs).eval ρ = list.prod (xs.map (nterm.eval ρ)) :=
 begin
   induction xs with x0 xs ih,
-  { simp [prod] },
+  { simp [prod, eval] },
   { cases xs with x1 xs,
-    { simp [prod] },
-    { unfold prod, rw [list.map_cons, list.prod_cons, eval_mul, ih, mul_comm] }}
+    { simp [prod, eval] },
+    { simp only [prod, list.map_cons, list.prod_cons, eval, ih],
+      rw mul_comm }}
 end
 
 def nonzero (ρ : dict α) (ts : list (nterm γ)) : Prop :=
