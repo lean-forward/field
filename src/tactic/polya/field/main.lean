@@ -1,4 +1,32 @@
-import data.nterm
+import data.polya.field
+
+namespace rat
+
+open polya.field
+
+instance : const_space ℚ :=
+{ df := by apply_instance,
+  lt := (<),
+  dec := by apply_instance,
+}
+
+instance {α} [discrete_field α] [char_zero α] : morph ℚ α :=
+{ cast       := by apply_instance,
+  morph_zero := rat.cast_zero,
+  morph_one  := rat.cast_one,
+  morph_add  := rat.cast_add,
+  morph_neg  := rat.cast_neg,
+  morph_mul  := rat.cast_mul,
+  morph_inv  := rat.cast_inv,
+  morph_inj  := begin
+      intros a ha,
+      apply rat.cast_inj.mp,
+      { rw rat.cast_zero, apply ha },
+      { resetI, apply_instance }
+    end,
+}
+
+end rat
 
 namespace list
 
@@ -17,7 +45,7 @@ begin
     { simp [ih] }}
 end
 
-open field tactic
+open polya.field tactic
 
 meta def expr_reflect (type : expr) : list expr → tactic expr
 | [] := to_expr ``([] : list %%type)
@@ -36,108 +64,14 @@ end list
 --
 --end finmap
 
-namespace field
-
-@[derive decidable_eq, derive has_reflect]
-inductive eterm (γ : Type) [const_space γ] : Type
-| zero  {} : eterm
-| one   {} : eterm
-| const {} : γ → eterm
-| atom  {} : num → eterm
-| add   {} : eterm → eterm → eterm
-| sub   {} : eterm → eterm → eterm
-| mul   {} : eterm → eterm → eterm
-| div   {} : eterm → eterm → eterm
-| neg   {} : eterm → eterm
-| inv   {} : eterm → eterm
-| pow_nat {} : eterm → ℕ → eterm
-| pow_int {} : eterm → ℤ → eterm
-
-namespace eterm
-
-variables {α : Type} [discrete_field α]
-variables {γ : Type} [const_space γ]
-variables [morph γ α] {ρ : dict α}
-
-def eval (ρ : dict α) : eterm γ → α
-| zero      := 0
-| one       := 1
-| (const r) := ↑r
-| (atom i)  := ρ.val i
-| (add x y) := eval x + eval y
-| (sub x y) := eval x - eval y
-| (mul x y) := eval x * eval y
-| (div x y) := (eval x) / (eval y)
-| (neg x)   := - eval x
-| (inv x)   := (eval x)⁻¹
-| (pow_nat x n) := eval x ^ n
-| (pow_int x n) := eval x ^ n
-
-def to_nterm : eterm γ → nterm γ
-| zero      := 0
-| one       := 1
-| (const c) := c
-| (atom i)  := i
-| (add x y) := to_nterm x + to_nterm y
-| (sub x y) := to_nterm x - to_nterm y
-| (mul x y) := to_nterm x * to_nterm y
-| (div x y) := to_nterm x / to_nterm y
-| (neg x)   := - to_nterm x
-| (inv x)   := (to_nterm x)⁻¹
-| (pow_nat x n) := to_nterm x ^ n
-| (pow_int x n) := to_nterm x ^ n
-
-theorem correctness {x : eterm γ} :
-  nterm.eval ρ (to_nterm x) = eval ρ x :=
-begin
-  induction x with
-    c           --const
-    i           --atom
-    x y ihx ihy --add
-    x y ihx ihy --sub
-    x y ihx ihy --mul
-    x y ihx ihy --div
-    x ihx       --neg
-    x ihx       --inv
-    x n ihx     --pow_nat
-    x n ihx,    --pow_int
-  repeat {unfold to_nterm, unfold eval},
-  repeat { simp },
-  repeat { simp [ihx] },
-  repeat { simp [ihx, ihy] }
-end
-
-end eterm
-
-section norm
-
-variables {α : Type} [discrete_field α]
-variables {γ : Type} [const_space γ]
-variables [morph γ α] {ρ : dict α}
-
-def norm (x : eterm γ) : nterm γ :=
-x.to_nterm
-
-def norm_hyps (x : eterm γ) : list (nterm γ) :=
-[]
-
-theorem correctness {x : eterm γ} {ρ : dict α} :
-  (∀ t ∈ norm_hyps x, nterm.eval ρ t ≠ 0) →
-  eterm.eval ρ x = nterm.eval ρ (norm x) :=
-begin
-  intro h, apply eq.symm,
-  apply eterm.correctness
-end
-
-end norm
-
-end field
+namespace polya.field
+end polya.field
 
 namespace tactic
 open native tactic
 
-namespace field
-open field field.eterm
+namespace polya.field
+open polya.field polya.field.term
 
 meta structure cache_ty :=
 ( new_atom : num )
@@ -166,42 +100,21 @@ match s.atoms.find e with
     return i
 end
 
-meta def cache_ty.dict_expr (s : cache_ty) : tactic expr :=
+meta def cache_ty.dict_expr (α : expr) (s : cache_ty) : tactic expr :=
 do
-    e ← s.dict.values.expr_reflect `(ℝ), --TODO: for any α
+    e ← s.dict.values.expr_reflect α,
     mk_app `list.to_dict [e]
 
-@[reducible]
-def γ := ℚ
-
-instance : const_space γ :=
-{ df := by apply_instance,
-  lt := (<),
-  dec := by apply_instance
-}
-
-meta def eterm_of_expr : expr → state_dict (eterm γ) | e :=
+meta def term_of_expr : expr → state_dict term | e :=
 match e with
-| `(0 : ℝ) := return zero
-| `(1 : ℝ) := return one
-| `(%%a + %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (add x y)
-| `(%%a - %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (sub x y)
-| `(%%a * %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (mul x y)
-| `(%%a / %%b) := do y ← eterm_of_expr b, x ← eterm_of_expr a, return (div x y)
-| `(-%%a)      := do x ← eterm_of_expr a, return (neg x)
-| `((%%a)⁻¹)   := do x ← eterm_of_expr a, return (inv x)
-| `(%%a ^ %%b) := ( do
-                    n ← eval_expr ℕ b,
-                    x ← eterm_of_expr a,
-                    return (pow_nat x n)
-                  ) <|> ( do
-                    n ← eval_expr ℤ b,
-                    x ← eterm_of_expr a,
-                    return (pow_int x n)
-                  ) 
-| `(↑%%a)      := do c ← eval_expr γ a, return (const c)
-| _ := failure
---| `(@has_coe.coe ℚ ℝ %%h %%a) := do c ← eval_expr γ a, return (const c)
+| `(%%a + %%b) := do y ← term_of_expr b, x ← term_of_expr a, return (add x y)
+| `(%%a - %%b) := do y ← term_of_expr b, x ← term_of_expr a, return (sub x y)
+| `(%%a * %%b) := do y ← term_of_expr b, x ← term_of_expr a, return (mul x y)
+| `(%%a / %%b) := do y ← term_of_expr b, x ← term_of_expr a, return (div x y)
+| `(-%%a)      := do x ← term_of_expr a, return (neg x)
+| `((%%a)⁻¹)   := do x ← term_of_expr a, return (inv x)
+| `(%%a ^ %%b) := do x ← term_of_expr a, ( (do n ← b.to_nat, return (pow_nat x n)) <|> (do n ← b.to_int, return (pow_int x n)) )
+| _            := do n ← e.to_nat, return (numeral n)
 end <|> do i ← get_atom e, return (atom i)
 
 --private meta def znum_of_expr : expr → option znum
@@ -244,24 +157,38 @@ match n with
   to_expr ``(@has_neg.neg %%α %%h_neg %%e)
 end
 
-meta def nterm_to_expr (α : expr) (s : cache_ty) : nterm γ → tactic expr
+--TODO: more generic
+@[reducible] def α := ℚ
+@[reducible] def γ := ℚ
+
+meta def const_aux (c : γ) : tactic expr :=
+let n := c.num in
+let d := c.denom in
+if d = 1 then 
+  expr_of_znum `(α) (n : znum)
+else do
+  a ← expr_of_znum `(α) (n : znum),
+  b ← expr_of_znum `(α) (d : znum),
+  to_expr ``(%%a / %%b)
+
+meta def nterm_to_expr (s : cache_ty) : nterm γ → tactic expr
 | (nterm.atom i)  := s.dict.find i
-| (nterm.const c) := to_expr ``(%%(rat.reflect c) : %%α)
+| (nterm.const c) := const_aux c
 | (nterm.add x y) := do a ← nterm_to_expr x, b ← nterm_to_expr y, to_expr ``(%%a + %%b)
 | (nterm.mul x y) := do a ← nterm_to_expr x, b ← nterm_to_expr y, to_expr ``(%%a * %%b)
 | (nterm.pow x n) := do a ← nterm_to_expr x, b ← expr_of_znum `(ℤ) n, to_expr ``(%%a ^ %%b)
 
-meta def prove_norm_hyps (t : eterm ℚ) (s : cache_ty) : tactic (list expr × expr) :=
+meta def prove_norm_hyps (t : term) (s : cache_ty) : tactic (list expr × expr) :=
 do
   let t_expr : expr := reflect t,
-  ρ ← s.dict_expr,
+  ρ ← s.dict_expr `(α),
 
-  let nhyps := norm_hyps t,
-  nhyps ← monad.mapm (nterm_to_expr `(ℝ) s) nhyps,
+  let nhyps := norm_hyps γ t,
+  nhyps ← monad.mapm (nterm_to_expr s) nhyps,
   nhyps ← monad.mapm (λ e, to_expr ``(%%e ≠ 0)) nhyps,
   mvars ← monad.mapm mk_meta_var nhyps,
 
-  h ← to_expr ``(∀ x ∈ norm_hyps %%t_expr, nterm.eval %%ρ x ≠ 0),
+  h ← to_expr ``(∀ x ∈ norm_hyps γ %%t_expr, nterm.eval %%ρ x ≠ 0),
   pe ← to_expr ( mvars.foldr (λ e pe, ``((and.intro %%e %%pe))) ``(trivial) ) tt ff,
   ((), pr) ← solve_aux h (refine ``(list.pall_iff_forall_prop.mp _) >> exact pe >> done),
 
@@ -276,43 +203,41 @@ do
 meta def norm_expr (e : expr) (s : cache_ty) :
   tactic (expr × expr × expr × list expr × cache_ty) :=
 do
-  (t, s) ← (eterm_of_expr e).run s,
+  (t, s) ← (term_of_expr e).run s,
   let t_expr : expr := reflect t,
-  let norm_t := norm t,
-  norm_t_expr ← to_expr ``(norm %%t_expr),
-  ρ_expr ← s.dict_expr,
+  let norm_t := norm γ t,
+  norm_t_expr ← to_expr ``(norm γ %%t_expr),
+  ρ_expr ← s.dict_expr `(α),
 
   (mvars, pr0) ← prove_norm_hyps t s,
 
-  --reflexivity from expr to eterm
-  h1 ← to_expr ``(%%e = eterm.eval %%ρ_expr %%t_expr),
+  --reflexivity from expr to term
+  h1 ← to_expr ``(%%e = term.eval %%ρ_expr %%t_expr),
   ((), pr1) ← solve_aux h1 `[refl, done],
 
   --correctness theorem
-  --h2 ← to_expr ``(eterm.eval %%ρ_expr %%t_expr = nterm.eval %%ρ_expr %%norm_t_expr),
+  --h2 ← to_expr ``(term.eval %%ρ_expr %%t_expr = nterm.eval %%ρ_expr %%norm_t_expr),
   pr2 ← mk_app `field.correctness [pr0],
 
   --reflexivity from nterm to expr
-  new_e ← nterm_to_expr `(ℝ) s norm_t,
+  new_e ← nterm_to_expr s norm_t,
   h3 ← to_expr ``(nterm.eval %%ρ_expr %%norm_t_expr = %%new_e),
   pr3 ← mk_meta_var h3, --heavy computation in the kernel
 
   pr ← mk_eq_trans pr2 pr3 >>= mk_eq_trans pr1,
   return (new_e, pr, pr3, mvars, s)
 
-end field
+end polya.field
 
 meta def prove_by_reflexivity (mvs : list expr) : tactic unit :=
 do
   gs ← get_goals,
-  set_goals mvs,
-  all_goals reflexivity,
-  set_goals gs
+  set_goals $ mvs ++ gs
 
 end tactic
 
 open tactic interactive interactive.types lean.parser
-open tactic.field
+open tactic.polya.field
 
 meta def tactic.interactive.field1 : tactic unit :=
 do

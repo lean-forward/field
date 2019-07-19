@@ -1,7 +1,8 @@
 import .basic
 
-namespace nterm
+namespace polya.field
 
+namespace nterm
 
 namespace sform
 
@@ -12,7 +13,7 @@ variables [morph γ α] {ρ : dict α}
 instance : has_coe (option (nterm γ)) (nterm γ) := ⟨λ x, x.get_or_else (const 0)⟩
 
 private lemma eval_none : eval ρ ((none : option (nterm γ)) : nterm γ) = 0 :=
-by apply morph.morph0
+by apply morph.morph_zero'
 
 private lemma eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ x := rfl
 
@@ -40,7 +41,7 @@ begin
   { by_cases h1 : y.coeff = 0,
     { rw [eval_term_coeff y, h1], simp [add', h1] },
     { unfold add', rw [if_neg h1, eval_scale], unfold eval, rw eval_scale,
-      rw [add_mul, mul_assoc, ← morph.morph_mul, inv_mul_cancel h1, ← eval_term_coeff],
+      rw [add_mul, mul_assoc, ← morph.morph_mul', inv_mul_cancel h1, ← eval_term_coeff],
       simp }}
 end
 
@@ -151,6 +152,7 @@ else if lt x.term y.term then --TODO
 else
   add' s3 y
 
+--set_option pp.all true
 private lemma eval_aux {x y : nterm γ} {s1 s2 s3 : option (nterm γ)}
   ( H0 : x.coeff ≠ 0 ∧ y.coeff ≠ 0)
   ( H1 : eval ρ (s2 : nterm γ) = eval ρ (s1 : nterm γ) + eval ρ y )
@@ -165,7 +167,7 @@ begin
       have : eval ρ y + eval ρ x = 0,
       { have : coeff x = - coeff y, from eq_neg_of_add_eq_zero h2, 
         rw [eval_term_coeff x, eval_term_coeff y, h1],
-        rw [this, morph.morph_neg], ring },
+        rw [this, morph.morph_neg'], ring },
       simp [this] },
     { rw if_neg h2, rw [eval_add'], congr,
       unfold eval, rw [morph.morph_add, mul_add],
@@ -247,4 +249,7 @@ protected theorem eval_add {x y : nterm γ} : eval ρ (sform.add x y) = eval ρ 
 by { unfold sform.add, rw [eval_add_option, eval_to_option, eval_to_option] }
 
 end sform
+
 end nterm
+
+end polya.field

@@ -1,1 +1,1 @@
-import .nterm
+import .polya

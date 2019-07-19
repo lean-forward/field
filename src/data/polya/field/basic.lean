@@ -65,36 +65,22 @@ end
 
 end list
 
+namespace polya.field
+
 structure dict (α : Type) :=
 (val : num → α)
 
 class morph (γ : Type) [discrete_field γ] (α : Type) [discrete_field α] :=
-(cast   : has_coe γ α)
-(morph0 : ((0 : γ) : α) = 0)
-(morph1 : ((1 : γ) : α) = 1)
-(morph_add : ∀ a b : γ, ((a + b : γ) : α) = a + b)
-(morph_neg : ∀ a : γ, ((-a : γ) : α) = -a)
-(morph_mul : ∀ a b : γ, ((a * b : γ) : α) = a * b)
-(morph_inv : ∀ a : γ, ((a⁻¹ : γ) : α) = a⁻¹)
-(morph_inj : ∀ a : γ, (a : α) = 0 → a = 0)
+(cast       : has_coe γ α)
+(morph_zero : ((0 : γ) : α) = 0)
+(morph_one  : ((1 : γ) : α) = 1)
+(morph_add  : ∀ a b : γ, ((a + b : γ) : α) = a + b)
+(morph_neg  : ∀ a : γ, ((-a : γ) : α) = -a)
+(morph_mul  : ∀ a b : γ, ((a * b : γ) : α) = a * b)
+(morph_inv  : ∀ a : γ, ((a⁻¹ : γ) : α) = a⁻¹)
+(morph_inj  : ∀ a : γ, (a : α) = 0 → a = 0)
 
 namespace morph
-
-instance rat_morph {α} [discrete_field α] [char_zero α] : morph ℚ α :=
-{ cast      := by apply_instance,
-  morph0    := rat.cast_zero,
-  morph1    := rat.cast_one,
-  morph_add := rat.cast_add,
-  morph_neg := rat.cast_neg,
-  morph_mul := rat.cast_mul,
-  morph_inv := rat.cast_inv,
-  morph_inj := begin
-      intros a ha,
-      apply rat.cast_inj.mp,
-      { rw rat.cast_zero, apply ha },
-      { resetI, apply_instance }
-    end,
-}
 
 variables {α : Type} [discrete_field α]
 variables {γ : Type} [discrete_field γ]
@@ -103,20 +89,19 @@ variables {a b : γ}
 
 instance has_coe : has_coe γ α := morph.cast γ α
 
-@[simp, squash_cast] theorem morph0' : ((0 : γ) : α) = 0 := by apply morph.morph0
-@[simp, squash_cast] theorem morph1' : ((1 : γ) : α) = 1 := by apply morph.morph1
+@[simp, squash_cast] theorem morph_zero' : ((0 : γ) : α) = 0 := by apply morph.morph_zero
+@[simp, squash_cast] theorem morph_one'  : ((1 : γ) : α) = 1 := by apply morph.morph_one
 
-@[simp, move_cast] theorem morph_add' : ∀ a b : γ, ((a + b : γ) : α) = a + b := by apply morph_add
-@[simp, move_cast] theorem morph_neg' : ∀ a : γ, ((-a : γ) : α) = -a := by apply morph_neg
-@[simp, move_cast] theorem morph_mul' : ∀ a b : γ, ((a * b : γ) : α) = a * b := by apply morph_mul
-@[simp, move_cast] theorem morph_inv' : ∀ a : γ, ((a⁻¹ : γ) : α) = a⁻¹ := by apply morph_inv
+@[simp, move_cast] theorem morph_add' : ((a + b : γ) : α) = a + b := by apply morph_add
+@[simp, move_cast] theorem morph_neg' : ((-a : γ) : α) = -a       := by apply morph_neg
+@[simp, move_cast] theorem morph_mul' : ((a * b : γ) : α) = a * b := by apply morph_mul
+@[simp, move_cast] theorem morph_inv' : ((a⁻¹ : γ) : α) = a⁻¹     := by apply morph_inv
 
 @[simp, move_cast] theorem morph_sub : ((a - b : γ) : α) = a - b :=
 by rw [sub_eq_add_neg, morph.morph_add, morph.morph_neg, ← sub_eq_add_neg]
 
-@[simp, elim_cast] theorem morph_inj' : ∀ a b : γ, (a : α) = b ↔ a = b :=
+@[simp, elim_cast] theorem morph_inj' : (a : α) = b ↔ a = b :=
 begin
-  intros a b,
   apply iff.intro,
   { intro h, apply eq_of_sub_eq_zero,
     apply morph.morph_inj (a - b),
@@ -129,28 +114,34 @@ end
 @[simp, move_cast] theorem morph_div : ((a / b : γ) : α) = a / b :=
 by rw [division_def, morph.morph_mul, morph.morph_inv, ← division_def]
 
-@[simp, move_cast] theorem morph_pow_nat (n : ℕ) : ((a ^ n : γ) : α) = a ^ n :=
+@[simp, move_cast] theorem morph_pow_nat {n : ℕ} : ((a ^ n : γ) : α) = a ^ n :=
 begin
   induction n with _ ih,
-  { rw [pow_zero, pow_zero, morph.morph1] },
+  { rw [pow_zero, pow_zero, morph.morph_one] },
   { by_cases ha : a = 0,
-    { rw [ha, morph.morph0, zero_pow, zero_pow],
-      { apply morph.morph0 },
+    { rw [ha, morph.morph_zero, zero_pow, zero_pow],
+      { apply morph.morph_zero },
       { apply nat.succ_pos },
       { apply nat.succ_pos }},
     { rw [pow_succ, morph.morph_mul, ih, ← pow_succ] }}
 end
 
-@[simp, move_cast] theorem morph_pow (n : ℤ) : ((a ^ n : γ) : α) = a ^ n :=
+@[simp, move_cast] theorem morph_pow {n : ℤ} : ((a ^ n : γ) : α) = a ^ n :=
 begin
   cases n,
   { rw [int.of_nat_eq_coe, fpow_of_nat, fpow_of_nat],
     apply morph_pow_nat },
   { rw [int.neg_succ_of_nat_coe, fpow_neg, fpow_neg],
-    rw [morph_div, morph.morph1],
+    rw [morph_div, morph.morph_one],
     rw [fpow_of_nat, fpow_of_nat],
     rw morph_pow_nat }
 end
+
+@[simp, squash_cast] theorem morph_nat {n : ℕ} : ((n : γ) : α) = (n : α) :=
+by { induction n with n ih, { simp }, { simp [ih] } }
+
+@[simp, squash_cast] theorem morph_num {n : num} : ((n : γ) : α) = (n : α) :=
+by rw [← num.cast_to_nat, ← num.cast_to_nat, morph_nat, num.cast_to_nat, num.cast_to_nat]
 
 end morph
 
@@ -206,7 +197,7 @@ instance dec_lt : decidable_rel (@lt γ _) := by dunfold lt; apply_instance
 
 def eval (ρ : dict α) : nterm γ → α
 | (atom i)  := ρ.val i
-| (const c) := ↑c
+| (const c) := (c : α)
 | (add x y) := eval x + eval y
 | (mul x y) := eval x * eval y
 | (pow x n) := eval x ^ (n : ℤ)
@@ -226,7 +217,7 @@ if a = 0 then
   const 0
 else
   match x with
-  | (mul x (const b)) := mul x (const (a * b))
+  | (mul x (const b)) := mul x (const (b * a))
   | x := mul x (const a) --should not happen
   end
 
@@ -248,7 +239,7 @@ begin
     cases x, case mul : x y { 
       cases y, case const : b {
         unfold scale, unfold eval,
-        rw [mul_assoc, mul_comm a, morph.morph_mul] },
+        rw [mul_assoc, morph.morph_mul'] },
       repeat { refl }},
     repeat { refl }}
 end
@@ -259,9 +250,9 @@ begin
   case mul : x y { 
     cases y,
     case const : { unfold coeff, unfold term, refl },
-    repeat { unfold coeff, unfold term, rw [morph.morph1, mul_one] },
+    repeat { unfold coeff, unfold term, rw [morph.morph_one, mul_one] },
   },
-  repeat { unfold coeff, unfold term, rw [morph.morph1, mul_one] }
+  repeat { unfold coeff, unfold term, rw [morph.morph_one, mul_one] }
 end
 
 --theorem eval_scale_add {a b : γ} {x : nterm γ} : eval ρ (x.scale (a + b)) = eval ρ (x.scale a) + eval ρ (x.scale b) :=
@@ -269,10 +260,10 @@ end
 
 --theorem eval_scale_zero {x : nterm γ} :
 --  eval ρ (x.scale 0) = 0 :=
---by rw [eval_scale, morph.morph0, mul_zero]
+--by rw [eval_scale, morph.morph_zero, mul_zero]
 
 --theorem eval_scale_one {x : nterm γ} : eval ρ (x.scale 1) = eval ρ x :=
---by rw [eval_scale, morph.morph1, mul_one]
+--by rw [eval_scale, morph.morph_one, mul_one]
 --theorem eval_scale_neg {a : γ} {x : nterm γ} : eval ρ (x.scale (-a)) = - eval ρ (x.scale a) :=
 --by rw [eval_scale, eval_scale, morph.morph_neg, neg_mul_eq_mul_neg]
 
@@ -344,7 +335,7 @@ begin
     { apply absurd _ h2, have : exp x = 0, { rw h1, simp [h3] }, rw [h3, this] },
     { rw [if_neg h2, h1], unfold eval,
       rw [znum.div_to_int, znum.cast_mul, int.mul_div_cancel_left],
-      { rw [← fpow_mul, mul_comm, ← znum.cast_mul, ← h1, ← eval_mem_exp] },
+      { rw [← fpow_mul, int.mul_comm, ← znum.cast_mul, ← h1, ← eval_mem_exp] },
       { rw [← znum.cast_zero], exact_mod_cast h3 }}}
 end
 
@@ -373,3 +364,5 @@ begin
 end
 
 end nterm
+
+end polya.field

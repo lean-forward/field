@@ -1,5 +1,7 @@
 import .basic
 
+namespace polya.field
+
 namespace nterm
 
 namespace pform
@@ -11,9 +13,9 @@ variables [morph γ α] {ρ : dict α}
 instance : has_coe (option (nterm γ)) (nterm γ) := ⟨λ x, x.get_or_else (const 1)⟩
 
 private lemma eval_none : eval ρ ((none : option (nterm γ)) : nterm γ) = 1 :=
-by apply morph.morph1
+by apply morph.morph_one'
 
-private lemma eval_some {x : nterm γ } : eval ρ (some x : nterm γ) = eval ρ x := rfl
+private lemma eval_some {x : nterm γ} : eval ρ (some x : nterm γ) = eval ρ x := rfl
 
 local attribute [simp] eval_none
 local attribute [simp] eval_some
@@ -159,7 +161,7 @@ begin
     { rw if_neg H0, rw [eval_mul'], congr,
       unfold eval,
       by_cases h2 : exp x = 0,
-      { have : eval ρ x = 1, { rw [eval_mem_exp x, h2], simp }, rw [h1, h2, this, eval_mem_exp y], simp },
+      { have : eval ρ x = 1, { rw [eval_mem_exp x, h2], simp }, rw [h1, h2, this, eval_mem_exp y], simp, },
       { by_cases h3 : eval ρ (mem x) = 0,
         { have : eval ρ x = 0, { rw [eval_mem_exp x, h3, zero_fpow], rw ← znum.cast_zero, exact_mod_cast h2 },
           rw [h3, zero_fpow, this, mul_zero],
@@ -214,4 +216,7 @@ begin
 end
 
 end pform
+
 end nterm
+
+end polya.field
