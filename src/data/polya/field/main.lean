@@ -1,6 +1,53 @@
-import .norm
+import .sform .pform .norm
 
 namespace polya.field
+
+--namespace nterm
+--
+--variables {α : Type} [discrete_field α]
+--variables {γ : Type} [const_space γ]
+--variables [morph γ α] {ρ : dict α}
+--
+--instance coe_atom  : has_coe num (nterm γ) := ⟨atom⟩
+--instance coe_const : has_coe γ (nterm γ) := ⟨const⟩
+--
+--instance : has_zero (nterm γ) := ⟨const 0⟩
+--instance : has_one (nterm γ) := ⟨const 1⟩
+--
+--instance : has_add (nterm γ) := ⟨sform.add⟩
+--instance : has_mul (nterm γ) := ⟨pform.mul⟩
+--instance : has_pow (nterm γ) ℤ := ⟨λ (x : nterm γ) (n : ℤ), pow_mul (n : znum) x⟩
+--
+--instance : has_neg (nterm γ) := ⟨scale (-1)⟩
+--instance : has_sub (nterm γ) := ⟨λ x y, x + -y⟩
+--instance : has_inv (nterm γ) := ⟨λ x, x ^ (-1 : ℤ)⟩
+--instance : has_div (nterm γ) := ⟨λ x y, x * y⁻¹⟩
+--
+--instance pow_nat : has_pow (nterm γ) ℕ := ⟨λ (x : nterm γ) (n : ℕ), x ^ (n : ℤ)⟩
+--
+--section
+--
+--variables {x y : nterm γ} {i : num} {n : ℤ} {c : γ}
+--
+--@[simp] theorem eval_zero  : eval ρ (0 : nterm γ) = 0 := by apply morph.morph_zero'
+--@[simp] theorem eval_one   : eval ρ (1 : nterm γ) = 1 := by apply morph.morph_one'
+--@[simp] theorem eval_const : eval ρ (const c) = c     := rfl
+--@[simp] theorem eval_atom  : eval ρ (atom i : nterm γ) = ρ.val i := rfl
+--
+--@[simp] theorem eval_add : eval ρ (x + y) = eval ρ x + eval ρ y := sform.eval_add
+--@[simp] theorem eval_mul : eval ρ (x * y) = eval ρ x * eval ρ y := pform.eval_mul
+--@[simp] theorem eval_pow : eval ρ (x ^ n) = eval ρ x ^ n        := by { convert eval_pow_mul, rw znum.to_of_int }
+--
+--@[simp] theorem eval_neg : eval ρ (-x)    = - x.eval ρ          := by { refine eq.trans eval_scale _, rw [morph.morph_neg, morph.morph_one', mul_neg_one] }
+--@[simp] theorem eval_sub : eval ρ (x - y) = x.eval ρ - y.eval ρ := by { refine eq.trans eval_add _, rw [eval_neg, sub_eq_add_neg] }
+--@[simp] theorem eval_inv : eval ρ (x⁻¹)   = (x.eval ρ)⁻¹        := by { rw [← fpow_inv, ← eval_pow], refl }
+--@[simp] theorem eval_div : eval ρ (x / y) = x.eval ρ / y.eval ρ := by { rw [division_def, ← eval_inv, ← eval_mul], refl }
+--
+--@[simp] theorem eval_pow_nat {n : ℕ} : eval ρ (x ^ n) = eval ρ x ^ n := eval_pow
+--
+--end
+--
+--end nterm
 
 @[derive decidable_eq, derive has_reflect]
 inductive term : Type
@@ -34,14 +81,14 @@ def eval (ρ : dict α) : term → α
 | (pow_int x n) := eval x ^ n
 
 def to_nterm : term → nterm γ
-| (atom i)  := nterm.atom i
+| (atom i)  := ↑i
 | (add x y) := to_nterm x + to_nterm y
 | (sub x y) := to_nterm x - to_nterm y
 | (mul x y) := to_nterm x * to_nterm y
 | (div x y) := to_nterm x / to_nterm y
 | (neg x)   := - to_nterm x
 | (inv x)   := (to_nterm x)⁻¹
-| (numeral n)   := (nterm.const (n : γ))
+| (numeral n)   := ↑(n : γ)
 | (pow_nat x n) := to_nterm x ^ n
 | (pow_int x n) := to_nterm x ^ n
 
@@ -63,18 +110,20 @@ begin
   repeat { simp [nterm.eval] },
   repeat { simp [nterm.eval, ihx] },
   repeat { simp [nterm.eval, ihx, ihy] },
+  --{ rw [fpow_inv, division_def] },
+  --{ rw fpow_inv }
 end
 
 end term
 
 def norm (γ : Type) [const_space γ] (x : term) : nterm γ :=
-x.to_nterm.norm
+nterm.norm $ @term.to_nterm γ _ x
 
 def norm_hyps (γ : Type) [const_space γ] (x : term) : list (nterm γ) :=
-x.to_nterm.norm_hyps
+nterm.norm_hyps $ @term.to_nterm γ _ x
 
-variables {α : Type} [discrete_field α]
 variables {γ : Type} [const_space γ]
+variables {α : Type} [discrete_field α]
 variables [morph γ α] {ρ : dict α}
 
 theorem correctness {x : term} {ρ : dict α} :

@@ -97,11 +97,10 @@ match s.atoms.find e with
     return i
 end
 
-meta def cache_ty.dict_expr (s : cache_ty) : tactic expr :=
+meta def cache_ty.dict_expr (α : expr) (s : cache_ty) : tactic expr :=
 do
-    e ← s.dict.values.expr_reflect `(ℚ), --TODO: for any α
+    e ← s.dict.values.expr_reflect α,
     mk_app `list.to_dict [e]
-
 
 meta def term_of_expr : expr → state_dict term | e :=
 match e with
@@ -171,7 +170,7 @@ meta def nterm_to_expr (s : cache_ty) : nterm γ → tactic expr
 meta def prove_norm_hyps (t : term) (s : cache_ty) : tactic (list expr × expr) :=
 do
   let t_expr : expr := reflect t,
-  ρ ← s.dict_expr,
+  ρ ← s.dict_expr `(α),
 
   let nhyps := norm_hyps γ t,
   nhyps ← monad.mapm (nterm_to_expr s) nhyps,
@@ -196,9 +195,8 @@ do
   (t, s) ← (term_of_expr e).run s,
   let t_expr : expr := reflect t,
   let norm_t := norm γ t,
-  trace norm_t,
   norm_t_expr ← to_expr ``(norm γ %%t_expr),
-  ρ_expr ← s.dict_expr,
+  ρ_expr ← s.dict_expr `(α),
 
   (mvars, pr0) ← prove_norm_hyps t s,
 
@@ -240,16 +238,17 @@ do
   (new_e2, pr2, mv2, mvs', s) ← norm_expr e2 s,
 
   ( do
-    is_def_eq new_e1 new_e2,
+    unify new_e1 new_e2,
     prove_by_reflexivity [mv1, mv2],
     gs ← get_goals,
     set_goals (gs ++ mvs ++ mvs'),
-    mk_eq_symm pr2 >>= mk_eq_trans pr1 >>= tactic.exact
+    pr ← mk_eq_symm pr2 >>= mk_eq_trans pr1,
+    tactic.exact pr
   ) <|> ( do
-    pr0 ← to_expr ``(%%new_e1 = %%new_e2) >>= mk_meta_var,
-    pr ← mk_eq_symm pr2 >>= mk_eq_trans pr0 >>= mk_eq_trans pr1,
     prove_by_reflexivity [mv1, mv2],
+    pr0 ← to_expr ``(%%new_e1 = %%new_e2) >>= mk_meta_var,
     gs ← get_goals,
     set_goals (gs ++ [pr0] ++ mvs ++ mvs'),
+    pr ← mk_eq_symm pr2 >>= mk_eq_trans pr0 >>= mk_eq_trans pr1,
     tactic.exact pr
   )

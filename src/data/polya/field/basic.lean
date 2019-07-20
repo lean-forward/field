@@ -296,8 +296,134 @@ begin
       rw mul_comm }}
 end
 
-def nonzero (ρ : dict α) (ts : list (nterm γ)) : Prop :=
-∀ t ∈ ts, nterm.eval ρ t ≠ 0
+def scale (a : γ) (x : nterm γ) : nterm γ :=
+if a = 0 then
+  const 0
+else
+  match x with
+  | (mul x (const b)) := mul x (const (b * a))
+  | x := mul x (const a) --should not happen
+  end
+
+def coeff : nterm γ → γ
+| (mul x (const a)) := a
+| x := 1 --should not happen
+
+def term : nterm γ → nterm γ
+| (mul x (const a)) := x
+| x := x --should not happen
+
+@[simp] theorem eval_scale {a : γ} {x : nterm γ} :
+  eval ρ (x.scale a) = eval ρ x * a :=
+begin
+  unfold scale,
+  by_cases h1 : a = 0,
+  { rw [if_pos h1, h1], simp [eval] },
+  { rw [if_neg h1],
+    cases x, case mul : x y {
+      cases y, case const : b {
+        unfold scale, unfold eval,
+        rw [mul_assoc, morph.morph_mul'] },
+      repeat { refl }},
+    repeat { refl }}
+end
+
+theorem eval_term_coeff (x : nterm γ) : eval ρ x = eval ρ x.term * x.coeff :=
+begin
+  cases x,
+  case mul : x y {
+    cases y,
+    case const : { unfold coeff, unfold term, refl },
+    repeat { unfold coeff, unfold term, rw [morph.morph_one, mul_one] },
+  },
+  repeat { unfold coeff, unfold term, rw [morph.morph_one, mul_one] }
+end
+
+--theorem eval_scale_add {a b : γ} {x : nterm γ} : eval ρ (x.scale (a + b)) = eval ρ (x.scale a) + eval ρ (x.scale b) :=
+--by rw [eval_scale, eval_scale, eval_scale, morph.morph_add, mul_add]
+
+--theorem eval_scale_zero {x : nterm γ} :
+--  eval ρ (x.scale 0) = 0 :=
+--by rw [eval_scale, morph.morph_zero, mul_zero]
+
+--theorem eval_scale_one {x : nterm γ} : eval ρ (x.scale 1) = eval ρ x :=
+--by rw [eval_scale, morph.morph_one, mul_one]
+--theorem eval_scale_neg {a : γ} {x : nterm γ} : eval ρ (x.scale (-a)) = - eval ρ (x.scale a) :=
+--by rw [eval_scale, eval_scale, morph.morph_neg, neg_mul_eq_mul_neg]
+
+--theorem scale_comp {a b : γ} : scale a ∘ scale b = scale (a * b) :=
+--begin
+--  funext x, cases x,
+--  case mul : x y {
+--    cases y, case const : a { dsimp [function.comp, scale], rw mul_assoc, refl },
+--    repeat { dsimp [function.comp, scale], refl }},
+--  repeat { dsimp [function.comp, scale], refl }
+--end
+
+def exp : nterm γ → znum
+| (pow _ n) := n
+| _ := 1
+
+def mem : nterm γ → nterm γ
+| (pow x _) := x
+| x := x
+
+theorem eval_mem_exp (x : nterm γ) : eval ρ x = eval ρ (mem x) ^ (exp x : ℤ) :=
+begin
+  cases x,
+  case pow : x n { dsimp [mem, exp, eval], refl },
+  repeat { dsimp [mem, exp, eval], rw fpow_one }
+end
+
+--theorem eval_mem_zero {x : nterm γ} : eval ρ x = 0 → eval ρ (mem x) = 0 :=
+--begin
+--  intro h1, cases x,
+--  case pow : x n { unfold mem, by_contradiction h2, exact fpow_ne_zero_of_ne_zero h2 _ h1 },
+--  repeat { exact h1 },
+--end
+
+def pow_mul (n : znum) (x : nterm γ) : nterm γ :=
+if n = 0 then
+  const 1
+else if x.exp * n = 1 then
+  x.mem
+else
+  pow x.mem (x.exp * n)
+
+def pow_div (n : znum) (x : nterm γ) : nterm γ :=
+if n = x.exp then
+  x.mem
+else
+  pow x.mem (x.exp / n)
+
+@[simp] theorem eval_pow_mul {n : znum} {x : nterm γ} : eval ρ (pow_mul n x) = eval ρ x ^ (n : ℤ) :=
+begin
+  unfold pow_mul,
+  by_cases h1 : n = 0,
+  { simp [eval, h1] },
+  { by_cases h2 : x.exp * n = 1,
+    { rw [if_neg h1, if_pos h2, eval_mem_exp x],
+      rw [← fpow_mul, ← znum.cast_mul, h2],
+      simp },
+    { rw [if_neg h1, if_neg h2], unfold eval,
+      rw [znum.cast_mul, fpow_mul, ← eval_mem_exp]}}
+end
+
+@[simp] theorem eval_pow_div {n : znum} {x : nterm γ} : n ∣ x.exp → eval ρ (pow_div n x) ^ (n : ℤ) = eval ρ x :=
+begin
+  intro h1, cases h1 with d h1,
+  unfold pow_div,
+  by_cases h2 : n = exp x,
+  { rw [if_pos h2, h2, ← eval_mem_exp] },
+  { by_cases h3 : n = 0,
+    { apply absurd _ h2, have : exp x = 0, { rw h1, simp [h3] }, rw [h3, this] },
+    { rw [if_neg h2, h1], unfold eval,
+      rw [znum.div_to_int, znum.cast_mul, int.mul_div_cancel_left],
+      { rw [← fpow_mul, int.mul_comm, ← znum.cast_mul, ← h1, ← eval_mem_exp] },
+      { rw [← znum.cast_zero], exact_mod_cast h3 }}}
+end
+
+def nonzero (ρ : dict α) (ts : list (nterm γ)) : Prop := ∀ t ∈ ts, nterm.eval ρ t ≠ 0
 
 theorem nonzero_union {xs ys : list (nterm γ)} :
 nonzero ρ (xs ∪ ys) ↔ nonzero ρ xs ∧ nonzero ρ ys :=
