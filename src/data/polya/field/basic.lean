@@ -236,7 +236,7 @@ begin
   by_cases h1 : a = 0,
   { rw [if_pos h1, h1], simp [eval] },
   { rw [if_neg h1],
-    cases x, case mul : x y { 
+    cases x, case mul : x y {
       cases y, case const : b {
         unfold scale, unfold eval,
         rw [mul_assoc, morph.morph_mul'] },
@@ -247,7 +247,7 @@ end
 theorem eval_term_coeff (x : nterm γ) : eval ρ x = eval ρ x.term * x.coeff :=
 begin
   cases x,
-  case mul : x y { 
+  case mul : x y {
     cases y,
     case const : { unfold coeff, unfold term, refl },
     repeat { unfold coeff, unfold term, rw [morph.morph_one, mul_one] },
