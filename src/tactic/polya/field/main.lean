@@ -1,5 +1,51 @@
 import data.polya.field
 
+namespace tactic
+
+meta def pexpr_of_pos_num (α h_one h_add : expr) : pos_num → pexpr
+| pos_num.one      := ``(@has_one.one %%α %%h_one)
+| (pos_num.bit0 n) := ``(@bit0 %%α %%h_add (%%(pexpr_of_pos_num n)))
+| (pos_num.bit1 n) := ``(@bit1 %%α %%h_one %%h_add (%%(pexpr_of_pos_num n)))
+
+meta def expr_of_num (α : expr) (n : num) : tactic expr :=
+match n with
+| num.zero := do
+  h_zero ← mk_app `has_zero [α] >>= mk_instance,
+  to_expr ``(@has_zero.zero %%α %%h_zero)
+| (num.pos (pos_num.one)) := do
+  h_one ← mk_app `has_one [α] >>= mk_instance,
+  to_expr ``(@has_one.one %%α %%h_one)
+| (num.pos m) := do
+  h_one ← mk_app `has_one [α] >>= mk_instance,
+  h_add ← mk_app `has_add [α] >>= mk_instance,
+  to_expr (pexpr_of_pos_num α h_one h_add m)
+end
+
+meta def expr_of_znum (α : expr) (n : znum) : tactic expr :=
+match n with
+| znum.zero := do
+  h_zero ← mk_app `has_zero [α] >>= mk_instance,
+  to_expr ``(@has_zero.zero %%α %%h_zero)
+| (znum.pos n) :=
+  expr_of_num α (num.pos n)
+| (znum.neg n) := do
+  h_neg ← mk_app `has_neg [α] >>= mk_instance,
+  e ← expr_of_num α (num.pos n),
+  to_expr ``(@has_neg.neg %%α %%h_neg %%e)
+end
+
+meta def expr_of_rat (α : expr) (q : ℚ) : tactic expr :=
+let n : znum := q.num in
+let d : znum := q.denom in
+if d = 1 then
+  expr_of_znum α n
+else do
+  a ← expr_of_znum α n,
+  b ← expr_of_znum α d,
+  to_expr ``(%%a / %%b)
+
+end tactic
+
 namespace rat
 
 open polya.field
@@ -114,55 +160,13 @@ match e with
 | _            := do n ← e.to_nat, return (numeral n)
 end <|> do i ← get_atom e, return (atom i)
 
-private meta def pexpr_of_pos_num (α h_one h_add : expr) : pos_num → pexpr
-| pos_num.one      := ``(@has_one.one %%α %%h_one)
-| (pos_num.bit0 n) := ``(@bit0 %%α %%h_add (%%(pexpr_of_pos_num n)))
-| (pos_num.bit1 n) := ``(@bit1 %%α %%h_one %%h_add (%%(pexpr_of_pos_num n)))
-
-private meta def expr_of_num (α : expr) (n : num) : tactic expr :=
-match n with
-| num.zero := do
-  h_zero ← mk_app `has_zero [α] >>= mk_instance,
-  to_expr ``(@has_zero.zero %%α %%h_zero)
-| (num.pos (pos_num.one)) := do
-  h_one ← mk_app `has_one [α] >>= mk_instance,
-  to_expr ``(@has_one.one %%α %%h_one)
-| (num.pos m) := do
-  h_one ← mk_app `has_one [α] >>= mk_instance,
-  h_add ← mk_app `has_add [α] >>= mk_instance,
-  to_expr (pexpr_of_pos_num α h_one h_add m)
-end
-
-private meta def expr_of_znum (α : expr) (n : znum) : tactic expr :=
-match n with
-| znum.zero := do
-  h_zero ← mk_app `has_zero [α] >>= mk_instance,
-  to_expr ``(@has_zero.zero %%α %%h_zero)
-| (znum.pos n) :=
-  expr_of_num α (num.pos n)
-| (znum.neg n) := do
-  h_neg ← mk_app `has_neg [α] >>= mk_instance,
-  e ← expr_of_num α (num.pos n),
-  to_expr ``(@has_neg.neg %%α %%h_neg %%e)
-end
-
 --TODO: more generic
 @[reducible] def α := ℚ
 @[reducible] def γ := ℚ
 
-meta def const_aux (c : γ) : tactic expr :=
-let n := c.num in
-let d := c.denom in
-if d = 1 then
-  expr_of_znum `(α) (n : znum)
-else do
-  a ← expr_of_znum `(α) (n : znum),
-  b ← expr_of_znum `(α) (d : znum),
-  to_expr ``(%%a / %%b)
-
 meta def nterm_to_expr (s : cache_ty) : nterm γ → tactic expr
 | (nterm.atom i)  := s.dict.find i
-| (nterm.const c) := const_aux c
+| (nterm.const c) := expr_of_rat `(α) c
 | (nterm.add x y) := do a ← nterm_to_expr x, b ← nterm_to_expr y, to_expr ``(%%a + %%b)
 | (nterm.mul x y) := do a ← nterm_to_expr x, b ← nterm_to_expr y, to_expr ``(%%a * %%b)
 | (nterm.pow x n) := do a ← nterm_to_expr x, b ← expr_of_znum `(ℤ) n, to_expr ``(%%a ^ %%b)

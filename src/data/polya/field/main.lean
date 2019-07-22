@@ -138,4 +138,70 @@ begin
   { apply term.correctness }
 end
 
+open nterm
+
+def aux1 (t1 t2 : nterm γ) : nterm γ × nterm γ × γ :=
+if t2.coeff = 0 then
+  (t1.term, 0, t1.coeff)
+else
+  (t2.term, t1.scale (t2.coeff⁻¹), -t2.coeff)
+
+def aux2 (t1 t2 : nterm γ) : nterm γ × nterm γ × γ :=
+if t2.term < t1.term then
+  aux1 (t2.scale (-1)) (t1.scale (-1))
+else
+  aux1 t1 t2
+
+theorem eval_aux1 {t1 t2 t3 t4 : nterm γ} {c : γ} :
+  (t3, t4, c) = aux1 t1 t2 →
+  eval ρ t1 - eval ρ t2 = (eval ρ t3 - eval ρ t4) * c :=
+begin
+  unfold aux1,
+  by_cases h1 : t2.coeff = 0,
+  { rw if_pos h1, intro h2,
+    rw [prod.mk.inj_iff] at h2, cases h2 with h2 h3,
+    rw [prod.mk.inj_iff] at h3, cases h3 with h3 h4,
+    rw [eval_term_coeff t1, eval_term_coeff t2, h1, h2, h3, h4],
+    simp [morph.morph_neg] },
+  { rw if_neg h1, intro h2,
+    rw [prod.mk.inj_iff] at h2, cases h2 with h2 h3,
+    rw [prod.mk.inj_iff] at h3, cases h3 with h3 h4,
+    rw [h2, h3, h4],
+    rw [morph.morph_neg, mul_neg_eq_neg_mul_symm, neg_mul_eq_neg_mul, neg_sub, sub_mul],
+    rw [← eval_term_coeff], congr' 1,
+    rw [eval_scale, mul_assoc, ← morph.morph_mul, inv_mul_cancel],
+    rw [morph.morph_one, mul_one], --simp
+    exact h1 }
+end
+
+theorem eval_aux2 {t1 t2 t3 t4 : nterm γ} {c : γ} :
+  (t3, t4, c) = aux2 t1 t2 →
+  eval ρ t1 - eval ρ t2 = (eval ρ t3 - eval ρ t4) * c :=
+begin
+  unfold aux2,
+  by_cases h1 : t2.term < t1.term,
+  { rw if_pos h1, intro h2,
+    have : eval ρ (t2.scale (-1)) - eval ρ (t1.scale (-1)) = (eval ρ t3 - eval ρ t4) * ↑c,
+    { exact eval_aux1 h2 },
+    rw ← this, simp [morph.morph_neg] },
+  { rw if_neg h1, intro h2, exact eval_aux1 h2 }
+end
+
+def norm2 (γ : Type) [const_space γ] (t1 t2 : term) : nterm γ × nterm γ × γ :=
+  aux2 (norm γ t1) (norm γ t2)
+
+theorem eval_norm2 {t1 t2 : term} {nt1 nt2 : nterm γ} {c : γ} :
+  nonzero ρ (norm_hyps γ t1) →
+  nonzero ρ (norm_hyps γ t2) →
+  (nt1, nt2, c) = norm2 γ t1 t2 →
+  term.eval ρ t1 - term.eval ρ t2 =
+    (nterm.eval ρ nt1 - nterm.eval ρ nt2) * c :=
+begin
+  unfold norm2,
+  intros h1 h2 h3,
+  apply eq.trans,
+  { show _ = eval ρ (norm γ t1) - eval ρ (norm γ t2), rw [correctness h1, correctness h2] },
+  { exact eval_aux2 h3 }
+end
+
 end polya.field

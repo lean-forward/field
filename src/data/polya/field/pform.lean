@@ -105,11 +105,7 @@ private def f : option (nterm γ) → ℕ
 
 private lemma g_scale {x : nterm γ} {a : γ} : g (x.scale a) ≤ g x :=
 begin
-  by_cases h1 : a = 0,
-  { simp [scale, h1, g] },
-  { cases x,
-    case mul : x y { cases y, repeat {simp [scale, h1, g] } },
-    repeat { simp [scale, h1, g] }}
+  sorry
 end
 
 private lemma f_none {S : nterm γ} : f (none : option (nterm γ)) < f (some S) :=
@@ -144,7 +140,7 @@ private def aux (x y : nterm γ) (p1 p2 p3 : option (nterm γ)) : nterm γ :=
 if x.mem = y.mem then
   if x.exp + y.exp = 0 then (p1 : nterm γ)
   else mul' p1 (pow x.mem (x.exp + y.exp))
-else if lt x.term y.term then --TODO
+else if x.term < y.term then --TODO
   mul' p2 x
 else
   mul' p3 y

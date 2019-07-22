@@ -95,11 +95,7 @@ private def f : option (nterm γ) → ℕ
 
 private lemma g_scale {x : nterm γ} {a : γ} : g (x.scale a) ≤ g x :=
 begin
-  by_cases h1 : a = 0,
-  { simp [scale, h1, g] },
-  { cases x,
-    case mul : x y { cases y, repeat {simp [scale, h1, g] } },
-    repeat { simp [scale, h1, g] }}
+  sorry
 end
 
 private lemma f_none {S : nterm γ} : f (none : option (nterm γ)) < f (some S) :=
@@ -147,7 +143,7 @@ private def aux (x y : nterm γ) (s1 s2 s3 : option (nterm γ)) : nterm γ :=
 if x.term = y.term then
   if x.coeff + y.coeff = 0 then (s1 : nterm γ)
   else add' s1 (mul x.term (const (x.coeff + y.coeff)))
-else if lt x.term y.term then --TODO
+else if x.term < y.term then --TODO
   add' s2 x
 else
   add' s3 y

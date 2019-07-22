@@ -186,7 +186,7 @@ def blt :
 
 def lt : nterm γ → nterm γ → Prop := λ x y, blt x y
 instance : has_lt (nterm γ) := ⟨lt⟩
-instance dec_lt : decidable_rel (@lt γ _) := by dunfold lt; apply_instance
+instance dec_lt : decidable_rel ((<) : nterm γ → nterm γ → Prop) := by dsimp [has_lt.lt, lt]; apply_instance
 
 def eval (ρ : dict α) : nterm γ → α
 | (atom i)  := ρ.val i
@@ -296,36 +296,31 @@ begin
       rw mul_comm }}
 end
 
-def scale (a : γ) (x : nterm γ) : nterm γ :=
-if a = 0 then
-  const 0
-else
-  match x with
-  | (mul x (const b)) := mul x (const (b * a))
-  | x := mul x (const a) --should not happen
-  end
+def scale (a : γ) : nterm γ → nterm γ
+| (mul x (const b)) := mul x (const (b * a))
+| (const b) := (const (b * a))
+| x := mul x (const a)
 
 def coeff : nterm γ → γ
 | (mul x (const a)) := a
-| x := 1 --should not happen
+| (const a) := a
+| x := 1
 
 def term : nterm γ → nterm γ
 | (mul x (const a)) := x
-| x := x --should not happen
+| (const _) := 1
+| x := x
 
 @[simp] theorem eval_scale {a : γ} {x : nterm γ} :
   eval ρ (x.scale a) = eval ρ x * a :=
 begin
-  unfold scale,
-  by_cases h1 : a = 0,
-  { rw [if_pos h1, h1], simp [eval] },
-  { rw [if_neg h1],
-    cases x, case mul : x y {
-      cases y, case const : b {
-        unfold scale, unfold eval,
-        rw [mul_assoc, morph.morph_mul'] },
-      repeat { refl }},
-    repeat { refl }}
+  cases x,
+  case mul : x y {
+    cases y,
+    case const : b { simp [scale, eval, mul_assoc] },
+    repeat { simp [scale, eval] }},
+  case const : b { simp [scale, eval] },
+  repeat { simp [scale, eval] }
 end
 
 theorem eval_term_coeff (x : nterm γ) : eval ρ x = eval ρ x.term * x.coeff :=
@@ -333,32 +328,11 @@ begin
   cases x,
   case mul : x y {
     cases y,
-    case const : { unfold coeff, unfold term, refl },
-    repeat { unfold coeff, unfold term, rw [morph.morph_one, mul_one] },
-  },
-  repeat { unfold coeff, unfold term, rw [morph.morph_one, mul_one] }
+    case const : b { simp [term, coeff, eval, mul_assoc] },
+    repeat { simp [term, coeff, eval] }},
+  case const : b { simp [term, coeff, eval] },
+  repeat { simp [term, coeff, eval] }
 end
-
---theorem eval_scale_add {a b : γ} {x : nterm γ} : eval ρ (x.scale (a + b)) = eval ρ (x.scale a) + eval ρ (x.scale b) :=
---by rw [eval_scale, eval_scale, eval_scale, morph.morph_add, mul_add]
-
---theorem eval_scale_zero {x : nterm γ} :
---  eval ρ (x.scale 0) = 0 :=
---by rw [eval_scale, morph.morph_zero, mul_zero]
-
---theorem eval_scale_one {x : nterm γ} : eval ρ (x.scale 1) = eval ρ x :=
---by rw [eval_scale, morph.morph_one, mul_one]
---theorem eval_scale_neg {a : γ} {x : nterm γ} : eval ρ (x.scale (-a)) = - eval ρ (x.scale a) :=
---by rw [eval_scale, eval_scale, morph.morph_neg, neg_mul_eq_mul_neg]
-
---theorem scale_comp {a b : γ} : scale a ∘ scale b = scale (a * b) :=
---begin
---  funext x, cases x,
---  case mul : x y {
---    cases y, case const : a { dsimp [function.comp, scale], rw mul_assoc, refl },
---    repeat { dsimp [function.comp, scale], refl }},
---  repeat { dsimp [function.comp, scale], refl }
---end
 
 def exp : nterm γ → znum
 | (pow _ n) := n
@@ -450,5 +424,68 @@ begin
 end
 
 end nterm
+
+set_option trace.app_builder true
+
+@[derive decidable_eq]
+inductive Term (γ : Type) [const_space γ] : bool → Type
+| zero {} : Term tt
+| one {} : Term ff
+| sform {} : Term tt → Term ff → γ → Term tt
+| pform {} : Term ff → Term tt → znum → znum → Term ff
+
+namespace Term
+
+open nterm
+
+variables {γ : Type} [const_space γ]
+variables {α : Type} [discrete_field α]
+variables [morph γ α] {ρ : dict α}
+
+--def blt : Π {a b : bool}, Term γ a → Term γ b → bool
+--| .(_) .(_) zero            zero            := ff
+--| .(_) _    zero            _               := tt
+--| .(_) .(_) one             one             := ff
+--| .(_) _    one             _               := tt
+--| .(_) .(_) (sform x y a)   (sform u v b)   := blt y v ∨ (y = v ∧ blt x u) ∨ (y = v ∧ x = u ∧ a < b)
+--| .(_) _    (sform _ _ _)   _               := tt
+--| .(_) .(_) (pform x y n m) (pform u v i j) := blt y v ∨ (y = v ∧ blt x u) ∨ (y = v ∧ x = u ∧ (n, m) < (i, j))
+
+def eval (ρ : dict α) : Π {b : bool}, Term γ b → α
+| .(tt) zero := 0
+| .(ff) one := 1
+| .(tt) (sform x y a) := (eval x + eval y ) * a
+| .(ff) (pform x y n m) := (eval x * (eval y ^ (n : ℤ))) ^ (m : ℤ)
+
+def to_nterm : Π {b : bool}, Term γ b → nterm γ
+| .(tt) zero := (const 0)
+| .(ff) one := (const 1)
+| .(tt) (sform x y a) := mul (add (to_nterm x) (to_nterm y)) (const a)
+| .(ff) (pform x y n m) := nterm.pow (mul (to_nterm x) (nterm.pow (to_nterm y) n)) m
+
+theorem correctness {ρ : dict α} {b : bool} {t : Term γ b} : eval ρ t = nterm.eval ρ (to_nterm t) :=
+begin
+  induction t with x y a ihx ihy x y n m ihx ihy,
+  { simp [to_nterm, eval, nterm.eval] },
+  { simp [to_nterm, eval, nterm.eval] },
+  { simp [to_nterm, eval, nterm.eval, ihx, ihy] },
+  { simp [to_nterm, eval, nterm.eval, ihx, ihy] },
+end
+
+def scale : γ → Term γ tt → Term γ tt
+| _ zero := zero
+| b (sform x y a) := sform x y (a * b)
+
+theorem eval_scale {b : γ} {x : Term γ tt} : eval ρ (scale b x) = eval ρ x * (b : α) :=
+begin
+  cases x with x y a,
+  { simp [scale, eval] },
+  { simp [scale, eval, add_mul, mul_assoc] }
+end
+
+def add : Term γ tt → Term γ tt → Term γ tt := sorry
+
+end Term
+
 
 end polya.field
